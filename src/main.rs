@@ -3,6 +3,7 @@
 //! This will blink an LED attached to GP25, which is the pin the Pico uses for the on-board LED.
 #![no_std]
 #![no_main]
+mod l298n;
 
 use bsp::entry;
 use defmt::*;
@@ -18,9 +19,12 @@ use rp_pico as bsp;
 use bsp::hal::{
     clocks::{init_clocks_and_plls, Clock},
     pac,
+    pwm::Slices,
     sio::Sio,
     watchdog::Watchdog,
 };
+
+use l298n::motor_controller::MotorController;
 
 #[entry]
 fn main() -> ! {
@@ -53,6 +57,32 @@ fn main() -> ! {
         &mut pac.RESETS,
     );
 
+    // Init PWMs
+    let pwm_slices = Slices::new(pac.PWM, &mut pac.RESETS);
+    // Configure PWM
+    let mut pwm3 = pwm_slices.pwm3;
+
+    pwm3.set_ph_correct();
+    pwm3.enable();
+
+    let mut channel_a = pwm3.channel_a;
+    let mut channel_b = pwm3.channel_b;
+
+    channel_a.output_to(pins.gpio6);
+    channel_b.output_to(pins.gpio7);
+
+    // set up motor controller
+    let mut motor_controller = MotorController::new(
+        pins.gpio8.into_push_pull_output(),
+        pins.gpio9.into_push_pull_output(),
+        pins.gpio10.into_push_pull_output(),
+        pins.gpio11.into_push_pull_output(),
+        channel_a,
+        channel_b,
+    );
+    motor_controller.set_duty(20, 20);
+    info!("motor_controller created");
+
     // This is the correct pin on the Raspberry Pico board. On other boards, even if they have an
     // on-board LED, it might need to be changed.
     // Notably, on the Pico W, the LED is not connected to any of the RP2040 GPIOs but to the cyw43 module instead. If you have
@@ -62,11 +92,13 @@ fn main() -> ! {
 
     loop {
         info!("on!");
+        motor_controller.forward();
         led_pin.set_high().unwrap();
-        delay.delay_ms(500);
+        delay.delay_ms(1000);
         info!("off!");
+        motor_controller.stop();
         led_pin.set_low().unwrap();
-        delay.delay_ms(500);
+        delay.delay_ms(1000);
     }
 }
 
