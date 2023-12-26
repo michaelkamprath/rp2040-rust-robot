@@ -1,0 +1,3 @@
+[submodule "hardware/rp-pico-sensor-shield/KiCad-RP-Pico"]
+	path = hardware/rp-pico-sensor-shield/KiCad-RP-Pico
+	url = git@github.com:ncarandini/KiCad-RP-Pico.git
