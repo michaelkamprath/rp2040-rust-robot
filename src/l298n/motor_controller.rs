@@ -39,6 +39,14 @@ where
         }
     }
 
+    pub fn enable_pin_a(&self) -> &ENA {
+        &self.ena
+    }
+
+    pub fn enable_pin_b(&self) -> &ENB {
+        &self.enb
+    }
+
     pub fn set_duty(&mut self, duty_a: ENA::Duty, duty_b: ENB::Duty) {
         self.ena.set_duty(duty_a);
         self.enb.set_duty(duty_b);

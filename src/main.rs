@@ -8,7 +8,7 @@ mod l298n;
 use bsp::entry;
 use defmt::*;
 use defmt_rtt as _;
-use embedded_hal::digital::v2::OutputPin;
+use embedded_hal::{digital::v2::OutputPin, PwmPin};
 use panic_probe as _;
 
 // Provide an alias for our BSP so we can switch targets quickly.
@@ -80,7 +80,10 @@ fn main() -> ! {
         channel_a,
         channel_b,
     );
-    motor_controller.set_duty(20, 20);
+    motor_controller.set_duty(
+        (0.1 * motor_controller.enable_pin_a().get_max_duty() as f32) as u16,
+        (0.1 * motor_controller.enable_pin_b().get_max_duty() as f32) as u16,
+    );
     info!("motor_controller created");
 
     // This is the correct pin on the Raspberry Pico board. On other boards, even if they have an
