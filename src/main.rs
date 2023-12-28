@@ -81,8 +81,8 @@ fn main() -> ! {
         channel_b,
     );
     motor_controller.set_duty(
-        (0.1 * motor_controller.enable_pin_a().get_max_duty() as f32) as u16,
-        (0.1 * motor_controller.enable_pin_b().get_max_duty() as f32) as u16,
+        (0.01 * motor_controller.enable_pin_a().get_max_duty() as f32) as u16,
+        (1.0 * motor_controller.enable_pin_b().get_max_duty() as f32) as u16,
     );
     info!("motor_controller created");
 
@@ -97,7 +97,19 @@ fn main() -> ! {
         info!("on!");
         motor_controller.forward();
         led_pin.set_high().unwrap();
-        delay.delay_ms(1000);
+        delay.delay_ms(250);
+        led_pin.set_low().unwrap();
+        delay.delay_ms(100);
+        led_pin.set_high().unwrap();
+        delay.delay_ms(250);
+        led_pin.set_low().unwrap();
+        delay.delay_ms(100);
+        led_pin.set_high().unwrap();
+        delay.delay_ms(250);
+        led_pin.set_low().unwrap();
+        delay.delay_ms(100);
+        led_pin.set_high().unwrap();
+        delay.delay_ms(250);
         info!("off!");
         motor_controller.stop();
         led_pin.set_low().unwrap();
