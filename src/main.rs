@@ -4,12 +4,14 @@
 #![no_std]
 #![no_main]
 mod l298n;
+mod robot;
 
-use bsp::entry;
+use bsp::{entry, hal::fugit::HertzU32};
 use defmt::*;
 use defmt_rtt as _;
-use embedded_hal::{digital::v2::OutputPin, PwmPin};
+use embedded_hal::digital::v2::OutputPin;
 use panic_probe as _;
+use rp_pico::hal::gpio;
 
 // Provide an alias for our BSP so we can switch targets quickly.
 // Uncomment the BSP you included in Cargo.toml, the rest of the code does not need to change.
@@ -24,7 +26,7 @@ use bsp::hal::{
     watchdog::Watchdog,
 };
 
-use l298n::motor_controller::MotorController;
+use robot::Robot;
 
 #[entry]
 fn main() -> ! {
@@ -71,20 +73,29 @@ fn main() -> ! {
     channel_a.output_to(pins.gpio6);
     channel_b.output_to(pins.gpio7);
 
-    // set up motor controller
-    let mut motor_controller = MotorController::new(
+    // set up I2C
+    let i2c = bsp::hal::I2C::new_controller(
+        pac.I2C0,
+        pins.gpio4.into_function::<gpio::FunctionI2c>(),
+        pins.gpio5.into_function::<gpio::FunctionI2c>(),
+        HertzU32::from_raw(400_000),
+        &mut pac.RESETS,
+        clocks.system_clock.freq(),
+    );
+
+    let mut robot = Robot::new(
         pins.gpio8.into_push_pull_output(),
         pins.gpio9.into_push_pull_output(),
         pins.gpio10.into_push_pull_output(),
         pins.gpio11.into_push_pull_output(),
         channel_a,
         channel_b,
+        pins.gpio0.into_pull_up_input(),
+        pins.gpio1.into_pull_up_input(),
+        i2c,
     );
-    motor_controller.set_duty(
-        (0.01 * motor_controller.enable_pin_a().get_max_duty() as f32) as u16,
-        (1.0 * motor_controller.enable_pin_b().get_max_duty() as f32) as u16,
-    );
-    info!("motor_controller created");
+
+    info!("robot controller created");
 
     // This is the correct pin on the Raspberry Pico board. On other boards, even if they have an
     // on-board LED, it might need to be changed.
@@ -95,7 +106,7 @@ fn main() -> ! {
 
     loop {
         info!("on!");
-        motor_controller.forward();
+        robot.forward(0.1);
         led_pin.set_high().unwrap();
         delay.delay_ms(250);
         led_pin.set_low().unwrap();
@@ -111,7 +122,7 @@ fn main() -> ! {
         led_pin.set_high().unwrap();
         delay.delay_ms(250);
         info!("off!");
-        motor_controller.stop();
+        robot.stop();
         led_pin.set_low().unwrap();
         delay.delay_ms(1000);
     }
