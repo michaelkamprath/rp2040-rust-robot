@@ -1,7 +1,7 @@
 [hooks]
 pre-commit = "cargo clippy --all-features -- --deny=warnings"
 pre-push = "cargo fmt -- --check"
-post-commit = "git fetch"
+post-commit = ""
 
 [logging]
 verbose = true
