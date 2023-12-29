@@ -1455,6 +1455,10 @@
     (stroke (width 0) (type default))
     (uuid 0d55ef49-6c1b-4b74-8862-7e06dfe290e6)
   )
+  (wire (pts (xy 232.41 119.888) (xy 236.347 119.888))
+    (stroke (width 0) (type default))
+    (uuid 118e6e2a-ac6b-477b-9284-8c013c641bff)
+  )
   (wire (pts (xy 169.418 76.454) (xy 161.798 76.454))
     (stroke (width 0) (type default))
     (uuid 143f3be3-582a-4add-998b-00a27915faf5)
@@ -1511,7 +1515,7 @@
     (stroke (width 0) (type default))
     (uuid 1ff6890d-c128-4b57-b8f1-d6f2fbd49e27)
   )
-  (wire (pts (xy 212.344 140.97) (xy 228.854 140.97))
+  (wire (pts (xy 219.837 146.05) (xy 236.347 146.05))
     (stroke (width 0) (type default))
     (uuid 200ad66a-c7ff-46fa-b832-b0406731ce4b)
   )
@@ -1543,7 +1547,7 @@
     (stroke (width 0) (type default))
     (uuid 34a4c66f-97ed-4bd0-a411-fc7f41328bf6)
   )
-  (wire (pts (xy 232.918 95.758) (xy 232.918 100.33))
+  (wire (pts (xy 232.918 80.899) (xy 232.918 85.471))
     (stroke (width 0) (type default))
     (uuid 357a3ea6-d22a-4e2a-aaf6-776b71c94a0c)
   )
@@ -1581,7 +1585,7 @@
     (stroke (width 0) (type default))
     (uuid 44ecb6d0-1d79-4dc6-8468-b029c10ab39b)
   )
-  (wire (pts (xy 212.344 138.43) (xy 228.854 138.43))
+  (wire (pts (xy 219.837 143.51) (xy 236.347 143.51))
     (stroke (width 0) (type default))
     (uuid 477736c8-7ec1-43e1-9960-69d1111001d8)
   )
@@ -1629,6 +1633,10 @@
     (stroke (width 0) (type default))
     (uuid 514e0f06-7b94-46e7-9f71-d48cf399b4b0)
   )
+  (wire (pts (xy 219.837 124.968) (xy 236.347 124.968))
+    (stroke (width 0) (type default))
+    (uuid 52944828-1d90-4010-b843-0d9f2808b932)
+  )
   (wire (pts (xy 109.855 116.459) (xy 112.395 116.459))
     (stroke (width 0) (type default))
     (uuid 52ba2850-d0ff-4f6a-8b8b-300ca7e43796)
@@ -1653,7 +1661,7 @@
     (stroke (width 0) (type default))
     (uuid 5ab093b3-11bf-4976-a419-3e5b4278a8f7)
   )
-  (polyline (pts (xy 206.375 81.661) (xy 206.375 117.602))
+  (polyline (pts (xy 206.375 66.802) (xy 206.375 102.743))
     (stroke (width 0) (type default))
     (uuid 5ab54973-aa00-47c3-8175-41daa89ce6af)
   )
@@ -1719,7 +1727,7 @@
     (stroke (width 0) (type default))
     (uuid 713cf9fd-c58d-4f4d-869b-f27238f90543)
   )
-  (polyline (pts (xy 206.375 125.857) (xy 264.922 125.857))
+  (polyline (pts (xy 206.375 110.49) (xy 264.922 110.49))
     (stroke (width 0) (type default))
     (uuid 71beece0-69ad-405b-b67f-06fa22f18d17)
   )
@@ -1732,7 +1740,7 @@
     (stroke (width 0) (type default))
     (uuid 72583b3f-9136-4b2f-b3d2-61c48e241696)
   )
-  (wire (pts (xy 236.22 98.298) (xy 226.949 98.298))
+  (wire (pts (xy 236.22 83.439) (xy 226.949 83.439))
     (stroke (width 0) (type default))
     (uuid 773cadf3-bc62-4040-92af-fa6053fe2210)
   )
@@ -1744,7 +1752,7 @@
     (stroke (width 0) (type default))
     (uuid 77a25c6f-add5-47ed-8121-e7bd6f952910)
   )
-  (wire (pts (xy 236.22 93.218) (xy 226.949 93.218))
+  (wire (pts (xy 236.22 78.359) (xy 226.949 78.359))
     (stroke (width 0) (type default))
     (uuid 796380bc-ff4e-436c-a292-818759b4a4d1)
   )
@@ -1788,7 +1796,7 @@
     (stroke (width 0) (type default))
     (uuid 8a88d8d5-1148-4a32-b858-fc737a203435)
   )
-  (wire (pts (xy 232.918 95.758) (xy 236.22 95.758))
+  (wire (pts (xy 232.918 80.899) (xy 236.22 80.899))
     (stroke (width 0) (type default))
     (uuid 8aa4331b-691c-480b-b536-02ebe217e6b6)
   )
@@ -1796,7 +1804,7 @@
     (stroke (width 0) (type default))
     (uuid 8ab8b5de-a34e-4bac-bfa5-5b38cc4503ad)
   )
-  (polyline (pts (xy 264.922 161.798) (xy 264.922 125.857))
+  (polyline (pts (xy 264.922 161.798) (xy 264.922 110.49))
     (stroke (width 0) (type default))
     (uuid 8bd79a5f-73a9-4ddd-af17-4942a9545ffd)
   )
@@ -1857,7 +1865,7 @@
     (stroke (width 0) (type default))
     (uuid a5709fa1-7c25-44c3-a919-386401df6a36)
   )
-  (wire (pts (xy 224.917 133.35) (xy 228.854 133.35))
+  (wire (pts (xy 232.41 138.43) (xy 236.347 138.43))
     (stroke (width 0) (type default))
     (uuid a58e77b4-a32c-4bc1-b609-79f9bacd7109)
   )
@@ -1880,6 +1888,10 @@
   (wire (pts (xy 85.979 116.459) (xy 93.091 116.459))
     (stroke (width 0) (type default))
     (uuid ac39df43-9bd2-42da-83b9-aaf1484d873d)
+  )
+  (wire (pts (xy 219.837 122.428) (xy 236.347 122.428))
+    (stroke (width 0) (type default))
+    (uuid aceedced-ab93-40c8-8dcc-de783eb04127)
   )
   (wire (pts (xy 120.142 129.159) (xy 122.682 129.159))
     (stroke (width 0) (type default))
@@ -1904,6 +1916,10 @@
   (wire (pts (xy 161.798 45.974) (xy 169.418 45.974))
     (stroke (width 0) (type default))
     (uuid b736d683-e1de-4036-92ad-3980a4668bfd)
+  )
+  (wire (pts (xy 232.41 117.348) (xy 236.347 117.348))
+    (stroke (width 0) (type default))
+    (uuid b928e9fd-e136-4526-b7f1-2b9f892ebbfd)
   )
   (wire (pts (xy 31.877 149.479) (xy 31.877 141.859))
     (stroke (width 0) (type default))
@@ -1969,7 +1985,7 @@
     (stroke (width 0) (type default))
     (uuid d0c8d514-ff9c-4774-b30f-05cd83028586)
   )
-  (polyline (pts (xy 206.375 125.857) (xy 206.375 161.798))
+  (polyline (pts (xy 206.375 110.49) (xy 206.375 161.798))
     (stroke (width 0) (type default))
     (uuid d6f4f413-e24f-4d2d-9016-0ce542f41c53)
   )
@@ -2018,7 +2034,7 @@
     (stroke (width 0) (type default))
     (uuid e736c132-adc7-4b95-a75c-58cacc013214)
   )
-  (polyline (pts (xy 206.375 117.602) (xy 264.922 117.602))
+  (polyline (pts (xy 206.375 102.743) (xy 264.922 102.743))
     (stroke (width 0) (type default))
     (uuid e8aed3f2-10ac-4482-b3ff-6f66d09fb8bf)
   )
@@ -2039,12 +2055,12 @@
     (stroke (width 0) (type default))
     (uuid ef49fb92-3b29-47e7-9193-61ab7856e792)
   )
-  (polyline (pts (xy 264.922 117.602) (xy 264.922 81.661))
+  (polyline (pts (xy 264.922 102.743) (xy 264.922 66.802))
     (stroke (width 0) (type default))
     (uuid ef511636-f69b-4d73-a4ab-faf0153a657c)
   )
 
-  (wire (pts (xy 224.917 135.89) (xy 228.854 135.89))
+  (wire (pts (xy 232.41 140.97) (xy 236.347 140.97))
     (stroke (width 0) (type default))
     (uuid ef69e812-52c4-4891-bd8a-166b3d5b57d3)
   )
@@ -2073,7 +2089,7 @@
     (stroke (width 0) (type default))
     (uuid f8de63f6-7e94-426b-8834-09392699867f)
   )
-  (polyline (pts (xy 206.375 81.661) (xy 264.922 81.661))
+  (polyline (pts (xy 206.375 66.802) (xy 264.922 66.802))
     (stroke (width 0) (type default))
     (uuid fbdd1714-fb96-4e1e-b91b-c72c83e8dfb2)
   )
@@ -2099,7 +2115,7 @@
     (uuid ff43dc00-52bb-4a62-ba56-46087685c0de)
   )
 
-  (text "Qwiic Connector" (at 229.489 159.512 0)
+  (text "I2C Qwiic Connectors" (at 224.663 158.877 0)
     (effects (font (size 1.27 1.27)) (justify left bottom))
     (uuid 0d7734bf-fe37-4711-a662-2b8b15a76f4d)
   )
@@ -2111,7 +2127,7 @@
     (effects (font (size 1.27 1.27)) (justify left bottom))
     (uuid 6086bc75-f845-4db5-acb8-ffd2c4e64488)
   )
-  (text "RP2040 Debug Interface" (at 225.806 115.316 0)
+  (text "RP2040 Debug Interface" (at 225.806 100.457 0)
     (effects (font (size 1.27 1.27)) (justify left bottom))
     (uuid 6f058ed1-7217-465f-a9aa-887357e7195f)
   )
@@ -2179,10 +2195,10 @@
       (effects (font (size 1.27 1.27)) (justify right) hide)
     )
   )
-  (global_label "GPIO4" (shape input) (at 224.917 135.89 180) (fields_autoplaced)
+  (global_label "GPIO6" (shape input) (at 232.41 140.97 180) (fields_autoplaced)
     (effects (font (size 1.27 1.27)) (justify right))
     (uuid 2014d576-e77a-417b-9c89-e6d63a62a608)
-    (property "Intersheetrefs" "${INTERSHEET_REFS}" (at 216.247 135.89 0)
+    (property "Intersheetrefs" "${INTERSHEET_REFS}" (at 223.74 140.97 0)
       (effects (font (size 1.27 1.27)) (justify right) hide)
     )
   )
@@ -2235,10 +2251,10 @@
       (effects (font (size 1.27 1.27)) (justify left) hide)
     )
   )
-  (global_label "SWDIO" (shape input) (at 226.949 93.218 180) (fields_autoplaced)
+  (global_label "SWDIO" (shape input) (at 226.949 78.359 180) (fields_autoplaced)
     (effects (font (size 1.27 1.27)) (justify right))
     (uuid 4687c35c-e960-4a15-b5df-9d8fb66d4e70)
-    (property "Intersheetrefs" "${INTERSHEET_REFS}" (at 218.0976 93.218 0)
+    (property "Intersheetrefs" "${INTERSHEET_REFS}" (at 218.0976 78.359 0)
       (effects (font (size 1.27 1.27)) (justify right) hide)
     )
   )
@@ -2368,10 +2384,10 @@
       (effects (font (size 1.27 1.27)) (justify left) hide)
     )
   )
-  (global_label "GPIO5" (shape input) (at 224.917 133.35 180) (fields_autoplaced)
+  (global_label "GPIO7" (shape input) (at 232.41 138.43 180) (fields_autoplaced)
     (effects (font (size 1.27 1.27)) (justify right))
     (uuid 89eebb6e-2604-48b6-a9b5-7caca535b81c)
-    (property "Intersheetrefs" "${INTERSHEET_REFS}" (at 216.247 133.35 0)
+    (property "Intersheetrefs" "${INTERSHEET_REFS}" (at 223.74 138.43 0)
       (effects (font (size 1.27 1.27)) (justify right) hide)
     )
   )
@@ -2508,6 +2524,13 @@
       (effects (font (size 1.27 1.27)) (justify right) hide)
     )
   )
+  (global_label "GPIO5" (shape input) (at 232.41 117.348 180) (fields_autoplaced)
+    (effects (font (size 1.27 1.27)) (justify right))
+    (uuid d526c172-3559-4308-a210-40876c057f02)
+    (property "Intersheetrefs" "${INTERSHEET_REFS}" (at 223.74 117.348 0)
+      (effects (font (size 1.27 1.27)) (justify right) hide)
+    )
+  )
   (global_label "GPIO11" (shape input) (at 70.358 149.479 270) (fields_autoplaced)
     (effects (font (size 1.27 1.27)) (justify right))
     (uuid da625bc5-f7c3-41d5-9941-62d3544c98fc)
@@ -2543,10 +2566,17 @@
       (effects (font (size 1.27 1.27)) (justify right) hide)
     )
   )
-  (global_label "SWCLK" (shape input) (at 226.949 98.298 180) (fields_autoplaced)
+  (global_label "GPIO4" (shape input) (at 232.41 119.888 180) (fields_autoplaced)
+    (effects (font (size 1.27 1.27)) (justify right))
+    (uuid ec445abc-a384-4383-ab9e-fb1979acd34f)
+    (property "Intersheetrefs" "${INTERSHEET_REFS}" (at 223.74 119.888 0)
+      (effects (font (size 1.27 1.27)) (justify right) hide)
+    )
+  )
+  (global_label "SWCLK" (shape input) (at 226.949 83.439 180) (fields_autoplaced)
     (effects (font (size 1.27 1.27)) (justify right))
     (uuid ed67fb88-e21d-4d39-9b4d-0d1b23bac1db)
-    (property "Intersheetrefs" "${INTERSHEET_REFS}" (at 217.7348 98.298 0)
+    (property "Intersheetrefs" "${INTERSHEET_REFS}" (at 217.7348 83.439 0)
       (effects (font (size 1.27 1.27)) (justify right) hide)
     )
   )
@@ -2599,26 +2629,26 @@
     )
   )
 
-  (symbol (lib_id "power:GND") (at 212.344 140.97 0) (unit 1)
+  (symbol (lib_id "power:GND") (at 219.837 146.05 0) (unit 1)
     (in_bom yes) (on_board yes) (dnp no) (fields_autoplaced)
     (uuid 0502b4f6-f383-4690-a09d-f333a54da7f5)
-    (property "Reference" "#PWR013" (at 212.344 147.32 0)
+    (property "Reference" "#PWR015" (at 219.837 152.4 0)
       (effects (font (size 1.27 1.27)) hide)
     )
-    (property "Value" "GND" (at 212.344 144.915 0)
+    (property "Value" "GND" (at 219.837 149.995 0)
       (effects (font (size 1.27 1.27)))
     )
-    (property "Footprint" "" (at 212.344 140.97 0)
+    (property "Footprint" "" (at 219.837 146.05 0)
       (effects (font (size 1.27 1.27)) hide)
     )
-    (property "Datasheet" "" (at 212.344 140.97 0)
+    (property "Datasheet" "" (at 219.837 146.05 0)
       (effects (font (size 1.27 1.27)) hide)
     )
     (pin "1" (uuid a35cedd0-1a51-4891-9a38-4f6e49ab956c))
     (instances
       (project "rp-pico-sensor-shield"
         (path "/01191561-9ded-4746-bfa0-1bc8653df791"
-          (reference "#PWR013") (unit 1)
+          (reference "#PWR015") (unit 1)
         )
       )
     )
@@ -2627,7 +2657,7 @@
   (symbol (lib_id "power:GND") (at 223.52 23.114 0) (unit 1)
     (in_bom yes) (on_board yes) (dnp no) (fields_autoplaced)
     (uuid 05b39a14-d8b9-4502-98f3-4ebe1fd7674f)
-    (property "Reference" "#PWR07" (at 223.52 29.464 0)
+    (property "Reference" "#PWR016" (at 223.52 29.464 0)
       (effects (font (size 1.27 1.27)) hide)
     )
     (property "Value" "GND" (at 223.52 27.059 0)
@@ -2643,7 +2673,7 @@
     (instances
       (project "rp-pico-sensor-shield"
         (path "/01191561-9ded-4746-bfa0-1bc8653df791"
-          (reference "#PWR07") (unit 1)
+          (reference "#PWR016") (unit 1)
         )
       )
     )
@@ -2652,7 +2682,7 @@
   (symbol (lib_id "Connector_Generic:Conn_01x04") (at 65.278 124.079 90) (unit 1)
     (in_bom yes) (on_board yes) (dnp no) (fields_autoplaced)
     (uuid 09a53c0a-f98f-437d-9522-69dc53bd9927)
-    (property "Reference" "J10" (at 66.548 118.6647 90)
+    (property "Reference" "J9" (at 66.548 118.6647 90)
       (effects (font (size 1.27 1.27)))
     )
     (property "Value" "Conn_01x04" (at 66.548 121.0889 90)
@@ -2671,7 +2701,7 @@
     (instances
       (project "rp-pico-sensor-shield"
         (path "/01191561-9ded-4746-bfa0-1bc8653df791"
-          (reference "J10") (unit 1)
+          (reference "J9") (unit 1)
         )
       )
     )
@@ -2680,7 +2710,7 @@
   (symbol (lib_id "MCU_RaspberryPi_and_Boards:Pico") (at 144.018 52.324 0) (unit 1)
     (in_bom yes) (on_board yes) (dnp no) (fields_autoplaced)
     (uuid 0e19017f-e9e0-4b1c-af5d-69c1629c8b00)
-    (property "Reference" "U1" (at 144.018 22.201 0)
+    (property "Reference" "U2" (at 144.018 22.201 0)
       (effects (font (size 1.27 1.27)))
     )
     (property "Value" "Pico" (at 144.018 24.249 0)
@@ -2738,7 +2768,7 @@
     (instances
       (project "rp-pico-sensor-shield"
         (path "/01191561-9ded-4746-bfa0-1bc8653df791"
-          (reference "U1") (unit 1)
+          (reference "U2") (unit 1)
         )
       )
     )
@@ -2747,7 +2777,7 @@
   (symbol (lib_id "Connector_Generic:Conn_01x04") (at 50.038 136.779 90) (unit 1)
     (in_bom yes) (on_board yes) (dnp no) (fields_autoplaced)
     (uuid 126c617f-201b-4874-a06a-a1e3df83da0a)
-    (property "Reference" "J8" (at 51.308 131.3647 90)
+    (property "Reference" "J7" (at 51.308 131.3647 90)
       (effects (font (size 1.27 1.27)))
     )
     (property "Value" "Conn_01x04" (at 51.308 133.7889 90)
@@ -2766,7 +2796,7 @@
     (instances
       (project "rp-pico-sensor-shield"
         (path "/01191561-9ded-4746-bfa0-1bc8653df791"
-          (reference "J8") (unit 1)
+          (reference "J7") (unit 1)
         )
       )
     )
@@ -2775,7 +2805,7 @@
   (symbol (lib_id "power:GND") (at 165.481 138.938 0) (unit 1)
     (in_bom yes) (on_board yes) (dnp no) (fields_autoplaced)
     (uuid 1373b75f-fc4e-4895-a45f-b3e8f94e0b4d)
-    (property "Reference" "#PWR015" (at 165.481 145.288 0)
+    (property "Reference" "#PWR08" (at 165.481 145.288 0)
       (effects (font (size 1.27 1.27)) hide)
     )
     (property "Value" "GND" (at 165.481 142.883 0)
@@ -2791,7 +2821,7 @@
     (instances
       (project "rp-pico-sensor-shield"
         (path "/01191561-9ded-4746-bfa0-1bc8653df791"
-          (reference "#PWR015") (unit 1)
+          (reference "#PWR08") (unit 1)
         )
       )
     )
@@ -2800,7 +2830,7 @@
   (symbol (lib_id "Connector_Generic:Conn_01x04") (at 95.631 124.079 90) (unit 1)
     (in_bom yes) (on_board yes) (dnp no) (fields_autoplaced)
     (uuid 15a29e76-34b2-4466-b8ee-5ebd0bf59cef)
-    (property "Reference" "J16" (at 96.901 118.6647 90)
+    (property "Reference" "J15" (at 96.901 118.6647 90)
       (effects (font (size 1.27 1.27)))
     )
     (property "Value" "Conn_01x04" (at 96.901 121.0889 90)
@@ -2819,7 +2849,7 @@
     (instances
       (project "rp-pico-sensor-shield"
         (path "/01191561-9ded-4746-bfa0-1bc8653df791"
-          (reference "J16") (unit 1)
+          (reference "J15") (unit 1)
         )
       )
     )
@@ -2828,7 +2858,7 @@
   (symbol (lib_id "Connector_Generic:Conn_01x04") (at 95.631 136.779 90) (unit 1)
     (in_bom yes) (on_board yes) (dnp no) (fields_autoplaced)
     (uuid 1a37bc33-8286-4932-b3df-88272b9d34af)
-    (property "Reference" "J17" (at 96.901 131.3647 90)
+    (property "Reference" "J16" (at 96.901 131.3647 90)
       (effects (font (size 1.27 1.27)))
     )
     (property "Value" "Conn_01x04" (at 96.901 133.7889 90)
@@ -2847,7 +2877,7 @@
     (instances
       (project "rp-pico-sensor-shield"
         (path "/01191561-9ded-4746-bfa0-1bc8653df791"
-          (reference "J17") (unit 1)
+          (reference "J16") (unit 1)
         )
       )
     )
@@ -2856,7 +2886,7 @@
   (symbol (lib_id "Connector_Generic:Conn_01x03") (at 109.855 136.779 90) (unit 1)
     (in_bom yes) (on_board yes) (dnp no)
     (uuid 1ff39269-f70c-4c50-aab5-01ca3ca88886)
-    (property "Reference" "J18" (at 108.077 131.445 90)
+    (property "Reference" "J19" (at 108.077 131.445 90)
       (effects (font (size 1.27 1.27)) (justify right))
     )
     (property "Value" "Conn_01x03" (at 104.14 133.858 90)
@@ -2874,7 +2904,7 @@
     (instances
       (project "rp-pico-sensor-shield"
         (path "/01191561-9ded-4746-bfa0-1bc8653df791"
-          (reference "J18") (unit 1)
+          (reference "J19") (unit 1)
         )
       )
     )
@@ -2883,7 +2913,7 @@
   (symbol (lib_id "power:+5V") (at 169.418 18.796 0) (unit 1)
     (in_bom yes) (on_board yes) (dnp no)
     (uuid 2410fbf4-8e26-4de0-bbd1-910e9a99bcb2)
-    (property "Reference" "#PWR03" (at 169.418 22.606 0)
+    (property "Reference" "#PWR010" (at 169.418 22.606 0)
       (effects (font (size 1.27 1.27)) hide)
     )
     (property "Value" "+5V" (at 169.418 14.851 0)
@@ -2899,7 +2929,7 @@
     (instances
       (project "rp-pico-sensor-shield"
         (path "/01191561-9ded-4746-bfa0-1bc8653df791"
-          (reference "#PWR03") (unit 1)
+          (reference "#PWR010") (unit 1)
         )
       )
     )
@@ -2908,7 +2938,7 @@
   (symbol (lib_id "Connector_Generic:Conn_01x04") (at 34.417 111.379 90) (unit 1)
     (in_bom yes) (on_board yes) (dnp no) (fields_autoplaced)
     (uuid 27f4950a-3cfe-412c-86e1-58a31465802c)
-    (property "Reference" "J5" (at 35.687 105.9647 90)
+    (property "Reference" "J2" (at 35.687 105.9647 90)
       (effects (font (size 1.27 1.27)))
     )
     (property "Value" "Conn_01x04" (at 35.687 108.3889 90)
@@ -2927,32 +2957,32 @@
     (instances
       (project "rp-pico-sensor-shield"
         (path "/01191561-9ded-4746-bfa0-1bc8653df791"
-          (reference "J5") (unit 1)
+          (reference "J2") (unit 1)
         )
       )
     )
   )
 
-  (symbol (lib_id "power:+3.3V") (at 212.344 138.43 0) (unit 1)
+  (symbol (lib_id "power:+3.3V") (at 219.837 143.51 0) (unit 1)
     (in_bom yes) (on_board yes) (dnp no) (fields_autoplaced)
     (uuid 2bed4de1-776f-4a0e-b059-8c7199805a0e)
-    (property "Reference" "#PWR012" (at 212.344 142.24 0)
+    (property "Reference" "#PWR014" (at 219.837 147.32 0)
       (effects (font (size 1.27 1.27)) hide)
     )
-    (property "Value" "+3.3V" (at 212.344 134.485 0)
+    (property "Value" "+3.3V" (at 219.837 139.565 0)
       (effects (font (size 1.27 1.27)))
     )
-    (property "Footprint" "" (at 212.344 138.43 0)
+    (property "Footprint" "" (at 219.837 143.51 0)
       (effects (font (size 1.27 1.27)) hide)
     )
-    (property "Datasheet" "" (at 212.344 138.43 0)
+    (property "Datasheet" "" (at 219.837 143.51 0)
       (effects (font (size 1.27 1.27)) hide)
     )
     (pin "1" (uuid 39976584-ab5e-4e36-9911-060b123f07d2))
     (instances
       (project "rp-pico-sensor-shield"
         (path "/01191561-9ded-4746-bfa0-1bc8653df791"
-          (reference "#PWR012") (unit 1)
+          (reference "#PWR014") (unit 1)
         )
       )
     )
@@ -2961,7 +2991,7 @@
   (symbol (lib_id "power:GND") (at 62.23 40.894 0) (unit 1)
     (in_bom yes) (on_board yes) (dnp no) (fields_autoplaced)
     (uuid 2d720e70-3867-442f-a307-87603cf409e0)
-    (property "Reference" "#PWR02" (at 62.23 47.244 0)
+    (property "Reference" "#PWR03" (at 62.23 47.244 0)
       (effects (font (size 1.27 1.27)) hide)
     )
     (property "Value" "GND" (at 62.23 44.839 0)
@@ -2977,7 +3007,7 @@
     (instances
       (project "rp-pico-sensor-shield"
         (path "/01191561-9ded-4746-bfa0-1bc8653df791"
-          (reference "#PWR02") (unit 1)
+          (reference "#PWR03") (unit 1)
         )
       )
     )
@@ -2986,7 +3016,7 @@
   (symbol (lib_id "power:GND") (at 123.698 83.82 0) (mirror y) (unit 1)
     (in_bom yes) (on_board yes) (dnp no) (fields_autoplaced)
     (uuid 2db06587-6275-4c64-a7f4-fb5a39c6bdad)
-    (property "Reference" "#PWR06" (at 123.698 90.17 0)
+    (property "Reference" "#PWR05" (at 123.698 90.17 0)
       (effects (font (size 1.27 1.27)) hide)
     )
     (property "Value" "GND" (at 123.698 87.765 0)
@@ -3002,7 +3032,32 @@
     (instances
       (project "rp-pico-sensor-shield"
         (path "/01191561-9ded-4746-bfa0-1bc8653df791"
-          (reference "#PWR06") (unit 1)
+          (reference "#PWR05") (unit 1)
+        )
+      )
+    )
+  )
+
+  (symbol (lib_id "power:+3.3V") (at 219.837 122.428 0) (unit 1)
+    (in_bom yes) (on_board yes) (dnp no) (fields_autoplaced)
+    (uuid 32a716de-eb44-4bc9-ac64-e6d56f801d5d)
+    (property "Reference" "#PWR012" (at 219.837 126.238 0)
+      (effects (font (size 1.27 1.27)) hide)
+    )
+    (property "Value" "+3.3V" (at 219.837 118.483 0)
+      (effects (font (size 1.27 1.27)))
+    )
+    (property "Footprint" "" (at 219.837 122.428 0)
+      (effects (font (size 1.27 1.27)) hide)
+    )
+    (property "Datasheet" "" (at 219.837 122.428 0)
+      (effects (font (size 1.27 1.27)) hide)
+    )
+    (pin "1" (uuid c87e55be-77f9-4578-8406-90e521eb734e))
+    (instances
+      (project "rp-pico-sensor-shield"
+        (path "/01191561-9ded-4746-bfa0-1bc8653df791"
+          (reference "#PWR012") (unit 1)
         )
       )
     )
@@ -3011,7 +3066,7 @@
   (symbol (lib_id "Connector_Generic:Conn_01x04") (at 50.038 111.379 90) (unit 1)
     (in_bom yes) (on_board yes) (dnp no) (fields_autoplaced)
     (uuid 338afa53-9750-4612-a4bf-ac36c113c3f6)
-    (property "Reference" "J6" (at 51.308 105.9647 90)
+    (property "Reference" "J5" (at 51.308 105.9647 90)
       (effects (font (size 1.27 1.27)))
     )
     (property "Value" "Conn_01x04" (at 51.308 108.3889 90)
@@ -3030,7 +3085,7 @@
     (instances
       (project "rp-pico-sensor-shield"
         (path "/01191561-9ded-4746-bfa0-1bc8653df791"
-          (reference "J6") (unit 1)
+          (reference "J5") (unit 1)
         )
       )
     )
@@ -3039,7 +3094,7 @@
   (symbol (lib_id "Connector_Generic:Conn_01x04") (at 80.899 136.779 90) (unit 1)
     (in_bom yes) (on_board yes) (dnp no) (fields_autoplaced)
     (uuid 37eb1796-2048-467a-acc7-8f351ee4b626)
-    (property "Reference" "J14" (at 82.169 131.3647 90)
+    (property "Reference" "J13" (at 82.169 131.3647 90)
       (effects (font (size 1.27 1.27)))
     )
     (property "Value" "Conn_01x04" (at 82.169 133.7889 90)
@@ -3058,7 +3113,7 @@
     (instances
       (project "rp-pico-sensor-shield"
         (path "/01191561-9ded-4746-bfa0-1bc8653df791"
-          (reference "J14") (unit 1)
+          (reference "J13") (unit 1)
         )
       )
     )
@@ -3067,7 +3122,7 @@
   (symbol (lib_id "Connector_Generic:Conn_01x04") (at 34.417 136.779 90) (unit 1)
     (in_bom yes) (on_board yes) (dnp no) (fields_autoplaced)
     (uuid 3a72fb62-6ee7-4715-b794-123a757ef8ac)
-    (property "Reference" "J3" (at 35.687 131.3647 90)
+    (property "Reference" "J4" (at 35.687 131.3647 90)
       (effects (font (size 1.27 1.27)))
     )
     (property "Value" "Conn_01x04" (at 35.687 133.7889 90)
@@ -3086,7 +3141,7 @@
     (instances
       (project "rp-pico-sensor-shield"
         (path "/01191561-9ded-4746-bfa0-1bc8653df791"
-          (reference "J3") (unit 1)
+          (reference "J4") (unit 1)
         )
       )
     )
@@ -3095,7 +3150,7 @@
   (symbol (lib_id "power:+3.3V") (at 23.749 129.159 0) (unit 1)
     (in_bom yes) (on_board yes) (dnp no) (fields_autoplaced)
     (uuid 450bf41a-01c0-4784-a1d1-337258dd0940)
-    (property "Reference" "#PWR010" (at 23.749 132.969 0)
+    (property "Reference" "#PWR02" (at 23.749 132.969 0)
       (effects (font (size 1.27 1.27)) hide)
     )
     (property "Value" "+3.3V" (at 23.749 125.214 0)
@@ -3111,7 +3166,7 @@
     (instances
       (project "rp-pico-sensor-shield"
         (path "/01191561-9ded-4746-bfa0-1bc8653df791"
-          (reference "#PWR010") (unit 1)
+          (reference "#PWR02") (unit 1)
         )
       )
     )
@@ -3120,7 +3175,7 @@
   (symbol (lib_id "power:GND") (at 23.749 116.459 0) (unit 1)
     (in_bom yes) (on_board yes) (dnp no) (fields_autoplaced)
     (uuid 566cb7e4-4244-4415-8a88-9edc24140572)
-    (property "Reference" "#PWR011" (at 23.749 122.809 0)
+    (property "Reference" "#PWR01" (at 23.749 122.809 0)
       (effects (font (size 1.27 1.27)) hide)
     )
     (property "Value" "GND" (at 23.749 120.5921 0)
@@ -3136,32 +3191,60 @@
     (instances
       (project "rp-pico-sensor-shield"
         (path "/01191561-9ded-4746-bfa0-1bc8653df791"
-          (reference "#PWR011") (unit 1)
+          (reference "#PWR01") (unit 1)
         )
       )
     )
   )
 
-  (symbol (lib_id "power:GND") (at 232.918 100.33 0) (unit 1)
+  (symbol (lib_id "power:GND") (at 232.918 85.471 0) (unit 1)
     (in_bom yes) (on_board yes) (dnp no) (fields_autoplaced)
     (uuid 5b81bab8-fccb-4736-96cb-8591b0aa14c5)
-    (property "Reference" "#PWR016" (at 232.918 106.68 0)
+    (property "Reference" "#PWR017" (at 232.918 91.821 0)
       (effects (font (size 1.27 1.27)) hide)
     )
-    (property "Value" "GND" (at 232.918 104.275 0)
+    (property "Value" "GND" (at 232.918 89.416 0)
       (effects (font (size 1.27 1.27)))
     )
-    (property "Footprint" "" (at 232.918 100.33 0)
+    (property "Footprint" "" (at 232.918 85.471 0)
       (effects (font (size 1.27 1.27)) hide)
     )
-    (property "Datasheet" "" (at 232.918 100.33 0)
+    (property "Datasheet" "" (at 232.918 85.471 0)
       (effects (font (size 1.27 1.27)) hide)
     )
     (pin "1" (uuid 0f95e3ad-2255-416d-b85f-450323735725))
     (instances
       (project "rp-pico-sensor-shield"
         (path "/01191561-9ded-4746-bfa0-1bc8653df791"
-          (reference "#PWR016") (unit 1)
+          (reference "#PWR017") (unit 1)
+        )
+      )
+    )
+  )
+
+  (symbol (lib_id "SM04B-SRSS-TB:SM04B-SRSS-TB") (at 236.347 124.968 0) (mirror x) (unit 1)
+    (in_bom yes) (on_board yes) (dnp no)
+    (uuid 60ccecfd-7024-49ed-9dcc-1848b3b41695)
+    (property "Reference" "J25" (at 249.7455 122.5744 0)
+      (effects (font (size 1.524 1.524)) (justify left))
+    )
+    (property "Value" "I2C0" (at 249.7455 119.7416 0)
+      (effects (font (size 1.524 1.524)) (justify left))
+    )
+    (property "Footprint" "SM04B-SRSS-TB:CONN_SM04B-SRSS-TB_JST" (at 236.347 124.968 0)
+      (effects (font (size 1.27 1.27) italic) hide)
+    )
+    (property "Datasheet" "SM04B-SRSS-TB" (at 236.347 124.968 0)
+      (effects (font (size 1.27 1.27) italic) hide)
+    )
+    (pin "1" (uuid a2ad6fe5-6b92-479f-9097-8f7dc1d924f1))
+    (pin "3" (uuid feb3bd1a-6431-42ed-9ebe-f168a3a73f62))
+    (pin "4" (uuid 166fb173-04ab-4a91-88cd-3bb862568d82))
+    (pin "2" (uuid 07ee2eae-c203-419d-8de0-fd3ef0c97905))
+    (instances
+      (project "rp-pico-sensor-shield"
+        (path "/01191561-9ded-4746-bfa0-1bc8653df791"
+          (reference "J25") (unit 1)
         )
       )
     )
@@ -3170,7 +3253,7 @@
   (symbol (lib_id "Connector_Generic:Conn_01x04") (at 175.006 133.858 90) (unit 1)
     (in_bom yes) (on_board yes) (dnp no) (fields_autoplaced)
     (uuid 61d52336-ce8e-4ed5-94f2-5e954c3b2207)
-    (property "Reference" "J26" (at 176.276 128.4437 90)
+    (property "Reference" "J23" (at 176.276 128.4437 90)
       (effects (font (size 1.27 1.27)))
     )
     (property "Value" "Conn_01x04" (at 176.276 130.8679 90)
@@ -3189,25 +3272,25 @@
     (instances
       (project "rp-pico-sensor-shield"
         (path "/01191561-9ded-4746-bfa0-1bc8653df791"
-          (reference "J26") (unit 1)
+          (reference "J23") (unit 1)
         )
       )
     )
   )
 
-  (symbol (lib_id "SM04B-SRSS-TB:SM04B-SRSS-TB") (at 228.854 140.97 0) (mirror x) (unit 1)
+  (symbol (lib_id "SM04B-SRSS-TB:SM04B-SRSS-TB") (at 236.347 146.05 0) (mirror x) (unit 1)
     (in_bom yes) (on_board yes) (dnp no)
     (uuid 6b65cf90-f837-4ce6-ac97-3aa063c9f7c9)
-    (property "Reference" "J24" (at 242.2525 138.5764 0)
+    (property "Reference" "J26" (at 249.7455 143.6564 0)
       (effects (font (size 1.524 1.524)) (justify left))
     )
-    (property "Value" "SM04B-SRSS-TB" (at 242.2525 135.7436 0)
+    (property "Value" "I2C1" (at 249.7455 140.8236 0)
       (effects (font (size 1.524 1.524)) (justify left))
     )
-    (property "Footprint" "SM04B-SRSS-TB:CONN_SM04B-SRSS-TB_JST" (at 228.854 140.97 0)
+    (property "Footprint" "SM04B-SRSS-TB:CONN_SM04B-SRSS-TB_JST" (at 236.347 146.05 0)
       (effects (font (size 1.27 1.27) italic) hide)
     )
-    (property "Datasheet" "SM04B-SRSS-TB" (at 228.854 140.97 0)
+    (property "Datasheet" "SM04B-SRSS-TB" (at 236.347 146.05 0)
       (effects (font (size 1.27 1.27) italic) hide)
     )
     (pin "1" (uuid 6a18b3c2-03fa-4282-9bb5-cd834cdfe46e))
@@ -3217,7 +3300,7 @@
     (instances
       (project "rp-pico-sensor-shield"
         (path "/01191561-9ded-4746-bfa0-1bc8653df791"
-          (reference "J24") (unit 1)
+          (reference "J26") (unit 1)
         )
       )
     )
@@ -3226,7 +3309,7 @@
   (symbol (lib_id "Connector_Generic:Conn_01x03") (at 109.855 124.079 90) (unit 1)
     (in_bom yes) (on_board yes) (dnp no)
     (uuid 74c94af9-144e-461b-beb2-46fb8d13af32)
-    (property "Reference" "J19" (at 108.077 118.745 90)
+    (property "Reference" "J18" (at 108.077 118.745 90)
       (effects (font (size 1.27 1.27)) (justify right))
     )
     (property "Value" "Conn_01x03" (at 104.14 121.158 90)
@@ -3244,7 +3327,7 @@
     (instances
       (project "rp-pico-sensor-shield"
         (path "/01191561-9ded-4746-bfa0-1bc8653df791"
-          (reference "J19") (unit 1)
+          (reference "J18") (unit 1)
         )
       )
     )
@@ -3253,7 +3336,7 @@
   (symbol (lib_id "Connector_Generic:Conn_01x04") (at 80.899 111.379 90) (unit 1)
     (in_bom yes) (on_board yes) (dnp no) (fields_autoplaced)
     (uuid 75704142-5af8-4bac-bbc9-41070d3435d7)
-    (property "Reference" "J12" (at 82.169 105.9647 90)
+    (property "Reference" "J11" (at 82.169 105.9647 90)
       (effects (font (size 1.27 1.27)))
     )
     (property "Value" "Conn_01x04" (at 82.169 108.3889 90)
@@ -3272,7 +3355,7 @@
     (instances
       (project "rp-pico-sensor-shield"
         (path "/01191561-9ded-4746-bfa0-1bc8653df791"
-          (reference "J12") (unit 1)
+          (reference "J11") (unit 1)
         )
       )
     )
@@ -3281,7 +3364,7 @@
   (symbol (lib_id "Connector:Conn_01x02_Pin") (at 239.522 21.336 0) (unit 1)
     (in_bom yes) (on_board yes) (dnp no)
     (uuid 7b19ce8f-5f12-41ce-9214-e41d59b428e2)
-    (property "Reference" "J2" (at 236.22 21.844 0)
+    (property "Reference" "J27" (at 236.22 21.844 0)
       (effects (font (size 1.27 1.27)))
     )
     (property "Value" "AGND" (at 236.22 23.892 0)
@@ -3298,7 +3381,7 @@
     (instances
       (project "rp-pico-sensor-shield"
         (path "/01191561-9ded-4746-bfa0-1bc8653df791"
-          (reference "J2") (unit 1)
+          (reference "J27") (unit 1)
         )
       )
     )
@@ -3307,7 +3390,7 @@
   (symbol (lib_id "Connector_Generic:Conn_01x04") (at 80.899 124.079 90) (unit 1)
     (in_bom yes) (on_board yes) (dnp no) (fields_autoplaced)
     (uuid 82bf36fb-727f-42e9-bcf5-409e50fe02d3)
-    (property "Reference" "J13" (at 82.169 118.6647 90)
+    (property "Reference" "J12" (at 82.169 118.6647 90)
       (effects (font (size 1.27 1.27)))
     )
     (property "Value" "Conn_01x04" (at 82.169 121.0889 90)
@@ -3326,7 +3409,7 @@
     (instances
       (project "rp-pico-sensor-shield"
         (path "/01191561-9ded-4746-bfa0-1bc8653df791"
-          (reference "J13") (unit 1)
+          (reference "J12") (unit 1)
         )
       )
     )
@@ -3335,7 +3418,7 @@
   (symbol (lib_id "power:GND") (at 164.338 83.82 0) (unit 1)
     (in_bom yes) (on_board yes) (dnp no) (fields_autoplaced)
     (uuid 9ab4f6a7-3ee2-4e04-9057-0a033608cbaa)
-    (property "Reference" "#PWR05" (at 164.338 90.17 0)
+    (property "Reference" "#PWR07" (at 164.338 90.17 0)
       (effects (font (size 1.27 1.27)) hide)
     )
     (property "Value" "GND" (at 164.338 87.765 0)
@@ -3351,7 +3434,7 @@
     (instances
       (project "rp-pico-sensor-shield"
         (path "/01191561-9ded-4746-bfa0-1bc8653df791"
-          (reference "#PWR05") (unit 1)
+          (reference "#PWR07") (unit 1)
         )
       )
     )
@@ -3360,7 +3443,7 @@
   (symbol (lib_id "power:GND") (at 144.018 83.82 0) (unit 1)
     (in_bom yes) (on_board yes) (dnp no) (fields_autoplaced)
     (uuid 9dd9d48d-9fee-492e-90c9-319d3806aebb)
-    (property "Reference" "#PWR08" (at 144.018 90.17 0)
+    (property "Reference" "#PWR06" (at 144.018 90.17 0)
       (effects (font (size 1.27 1.27)) hide)
     )
     (property "Value" "GND" (at 144.018 87.765 0)
@@ -3376,7 +3459,32 @@
     (instances
       (project "rp-pico-sensor-shield"
         (path "/01191561-9ded-4746-bfa0-1bc8653df791"
-          (reference "#PWR08") (unit 1)
+          (reference "#PWR06") (unit 1)
+        )
+      )
+    )
+  )
+
+  (symbol (lib_id "power:GND") (at 219.837 124.968 0) (unit 1)
+    (in_bom yes) (on_board yes) (dnp no) (fields_autoplaced)
+    (uuid 9f72a834-20e1-4349-80ae-f132df1bc79b)
+    (property "Reference" "#PWR013" (at 219.837 131.318 0)
+      (effects (font (size 1.27 1.27)) hide)
+    )
+    (property "Value" "GND" (at 219.837 128.913 0)
+      (effects (font (size 1.27 1.27)))
+    )
+    (property "Footprint" "" (at 219.837 124.968 0)
+      (effects (font (size 1.27 1.27)) hide)
+    )
+    (property "Datasheet" "" (at 219.837 124.968 0)
+      (effects (font (size 1.27 1.27)) hide)
+    )
+    (pin "1" (uuid f621db22-141b-4f88-a939-7187fdd74914))
+    (instances
+      (project "rp-pico-sensor-shield"
+        (path "/01191561-9ded-4746-bfa0-1bc8653df791"
+          (reference "#PWR013") (unit 1)
         )
       )
     )
@@ -3385,7 +3493,7 @@
   (symbol (lib_id "power:+3.3V") (at 184.912 18.796 0) (unit 1)
     (in_bom yes) (on_board yes) (dnp no) (fields_autoplaced)
     (uuid a2c6aa32-f2c6-44e2-9337-ac2fe1ad0ec2)
-    (property "Reference" "#PWR04" (at 184.912 22.606 0)
+    (property "Reference" "#PWR011" (at 184.912 22.606 0)
       (effects (font (size 1.27 1.27)) hide)
     )
     (property "Value" "+3.3V" (at 184.912 14.851 0)
@@ -3401,7 +3509,7 @@
     (instances
       (project "rp-pico-sensor-shield"
         (path "/01191561-9ded-4746-bfa0-1bc8653df791"
-          (reference "#PWR04") (unit 1)
+          (reference "#PWR011") (unit 1)
         )
       )
     )
@@ -3410,7 +3518,7 @@
   (symbol (lib_id "Connector_Generic:Conn_01x03") (at 122.682 111.379 90) (unit 1)
     (in_bom yes) (on_board yes) (dnp no)
     (uuid a5b2a09a-cda2-432d-bb96-0a4679e8124c)
-    (property "Reference" "J21" (at 120.904 106.045 90)
+    (property "Reference" "J20" (at 120.904 106.045 90)
       (effects (font (size 1.27 1.27)) (justify right))
     )
     (property "Value" "Conn_01x03" (at 116.967 108.458 90)
@@ -3428,7 +3536,7 @@
     (instances
       (project "rp-pico-sensor-shield"
         (path "/01191561-9ded-4746-bfa0-1bc8653df791"
-          (reference "J21") (unit 1)
+          (reference "J20") (unit 1)
         )
       )
     )
@@ -3463,7 +3571,7 @@
   (symbol (lib_id "Connector_Generic:Conn_01x03") (at 122.682 124.079 90) (unit 1)
     (in_bom yes) (on_board yes) (dnp no)
     (uuid ad5ec554-31d4-4f0a-92de-3fdd697b4fec)
-    (property "Reference" "J22" (at 120.904 118.745 90)
+    (property "Reference" "J21" (at 120.904 118.745 90)
       (effects (font (size 1.27 1.27)) (justify right))
     )
     (property "Value" "Conn_01x03" (at 116.967 121.158 90)
@@ -3481,7 +3589,7 @@
     (instances
       (project "rp-pico-sensor-shield"
         (path "/01191561-9ded-4746-bfa0-1bc8653df791"
-          (reference "J22") (unit 1)
+          (reference "J21") (unit 1)
         )
       )
     )
@@ -3490,7 +3598,7 @@
   (symbol (lib_id "Connector_Generic:Conn_01x04") (at 34.417 124.079 90) (unit 1)
     (in_bom yes) (on_board yes) (dnp no) (fields_autoplaced)
     (uuid b098078e-e597-47cd-b959-6ce54ba37302)
-    (property "Reference" "J4" (at 35.687 118.6647 90)
+    (property "Reference" "J3" (at 35.687 118.6647 90)
       (effects (font (size 1.27 1.27)))
     )
     (property "Value" "Conn_01x04" (at 35.687 121.0889 90)
@@ -3509,7 +3617,7 @@
     (instances
       (project "rp-pico-sensor-shield"
         (path "/01191561-9ded-4746-bfa0-1bc8653df791"
-          (reference "J4") (unit 1)
+          (reference "J3") (unit 1)
         )
       )
     )
@@ -3518,7 +3626,7 @@
   (symbol (lib_id "Connector_Generic:Conn_01x04") (at 50.038 124.079 90) (unit 1)
     (in_bom yes) (on_board yes) (dnp no) (fields_autoplaced)
     (uuid b37945b9-4827-42f1-8b88-ced6aad5cef1)
-    (property "Reference" "J7" (at 51.308 118.6647 90)
+    (property "Reference" "J6" (at 51.308 118.6647 90)
       (effects (font (size 1.27 1.27)))
     )
     (property "Value" "Conn_01x04" (at 51.308 121.0889 90)
@@ -3537,7 +3645,7 @@
     (instances
       (project "rp-pico-sensor-shield"
         (path "/01191561-9ded-4746-bfa0-1bc8653df791"
-          (reference "J7") (unit 1)
+          (reference "J6") (unit 1)
         )
       )
     )
@@ -3546,7 +3654,7 @@
   (symbol (lib_id "Connector_Generic:Conn_01x04") (at 175.133 148.59 90) (unit 1)
     (in_bom yes) (on_board yes) (dnp no) (fields_autoplaced)
     (uuid b742e276-3280-4e3f-b8f8-e77c877968b3)
-    (property "Reference" "J25" (at 176.403 143.1757 90)
+    (property "Reference" "J24" (at 176.403 143.1757 90)
       (effects (font (size 1.27 1.27)))
     )
     (property "Value" "Conn_01x04" (at 176.403 145.5999 90)
@@ -3565,7 +3673,7 @@
     (instances
       (project "rp-pico-sensor-shield"
         (path "/01191561-9ded-4746-bfa0-1bc8653df791"
-          (reference "J25") (unit 1)
+          (reference "J24") (unit 1)
         )
       )
     )
@@ -3574,7 +3682,7 @@
   (symbol (lib_id "power:+5V") (at 75.692 28.194 0) (unit 1)
     (in_bom yes) (on_board yes) (dnp no) (fields_autoplaced)
     (uuid b925726e-c42b-4727-ac64-24f31706439a)
-    (property "Reference" "#PWR01" (at 75.692 32.004 0)
+    (property "Reference" "#PWR04" (at 75.692 32.004 0)
       (effects (font (size 1.27 1.27)) hide)
     )
     (property "Value" "+5V" (at 75.692 24.249 0)
@@ -3590,7 +3698,7 @@
     (instances
       (project "rp-pico-sensor-shield"
         (path "/01191561-9ded-4746-bfa0-1bc8653df791"
-          (reference "#PWR01") (unit 1)
+          (reference "#PWR04") (unit 1)
         )
       )
     )
@@ -3651,7 +3759,7 @@
   (symbol (lib_id "power:GND") (at 247.904 23.876 0) (unit 1)
     (in_bom yes) (on_board yes) (dnp no) (fields_autoplaced)
     (uuid d3d9426b-dcc7-4742-ba7c-e4a29f9034f6)
-    (property "Reference" "#PWR09" (at 247.904 30.226 0)
+    (property "Reference" "#PWR018" (at 247.904 30.226 0)
       (effects (font (size 1.27 1.27)) hide)
     )
     (property "Value" "GND" (at 247.904 27.821 0)
@@ -3667,7 +3775,7 @@
     (instances
       (project "rp-pico-sensor-shield"
         (path "/01191561-9ded-4746-bfa0-1bc8653df791"
-          (reference "#PWR09") (unit 1)
+          (reference "#PWR018") (unit 1)
         )
       )
     )
@@ -3702,7 +3810,7 @@
   (symbol (lib_id "Connector_Generic:Conn_01x03") (at 122.682 136.779 90) (unit 1)
     (in_bom yes) (on_board yes) (dnp no)
     (uuid da6283c1-7f78-46c7-9f1e-86584c26d876)
-    (property "Reference" "J23" (at 120.904 131.445 90)
+    (property "Reference" "J22" (at 120.904 131.445 90)
       (effects (font (size 1.27 1.27)) (justify right))
     )
     (property "Value" "Conn_01x03" (at 116.967 133.858 90)
@@ -3720,7 +3828,7 @@
     (instances
       (project "rp-pico-sensor-shield"
         (path "/01191561-9ded-4746-bfa0-1bc8653df791"
-          (reference "J23") (unit 1)
+          (reference "J22") (unit 1)
         )
       )
     )
@@ -3729,7 +3837,7 @@
   (symbol (lib_id "Regulator_Linear:NCP1117-5.0_SOT223") (at 62.23 33.274 0) (unit 1)
     (in_bom yes) (on_board yes) (dnp no) (fields_autoplaced)
     (uuid e7fb06f1-da95-41dd-89b4-9a3a9a58e831)
-    (property "Reference" "U2" (at 62.23 27.789 0)
+    (property "Reference" "U1" (at 62.23 27.789 0)
       (effects (font (size 1.27 1.27)))
     )
     (property "Value" "NCP1117-5.0_SOT223" (at 62.23 29.837 0)
@@ -3747,7 +3855,7 @@
     (instances
       (project "rp-pico-sensor-shield"
         (path "/01191561-9ded-4746-bfa0-1bc8653df791"
-          (reference "U2") (unit 1)
+          (reference "U1") (unit 1)
         )
       )
     )
@@ -3756,7 +3864,7 @@
   (symbol (lib_id "Connector_Generic:Conn_01x03") (at 109.855 111.379 90) (unit 1)
     (in_bom yes) (on_board yes) (dnp no)
     (uuid e96b77b8-a80e-4b84-b5b9-53599e0ee293)
-    (property "Reference" "J20" (at 108.077 106.045 90)
+    (property "Reference" "J17" (at 108.077 106.045 90)
       (effects (font (size 1.27 1.27)) (justify right))
     )
     (property "Value" "Conn_01x03" (at 104.14 108.458 90)
@@ -3774,7 +3882,7 @@
     (instances
       (project "rp-pico-sensor-shield"
         (path "/01191561-9ded-4746-bfa0-1bc8653df791"
-          (reference "J20") (unit 1)
+          (reference "J17") (unit 1)
         )
       )
     )
@@ -3783,7 +3891,7 @@
   (symbol (lib_id "Connector_Generic:Conn_01x04") (at 95.631 111.379 90) (unit 1)
     (in_bom yes) (on_board yes) (dnp no) (fields_autoplaced)
     (uuid ea599c94-b5b3-4d95-8136-5249efa80aaa)
-    (property "Reference" "J15" (at 96.901 105.9647 90)
+    (property "Reference" "J14" (at 96.901 105.9647 90)
       (effects (font (size 1.27 1.27)))
     )
     (property "Value" "Conn_01x04" (at 96.901 108.3889 90)
@@ -3802,7 +3910,7 @@
     (instances
       (project "rp-pico-sensor-shield"
         (path "/01191561-9ded-4746-bfa0-1bc8653df791"
-          (reference "J15") (unit 1)
+          (reference "J14") (unit 1)
         )
       )
     )
@@ -3811,7 +3919,7 @@
   (symbol (lib_id "power:+5V") (at 165.481 153.67 0) (unit 1)
     (in_bom yes) (on_board yes) (dnp no)
     (uuid ecfde866-a88f-4182-907d-ba67ebd1d20a)
-    (property "Reference" "#PWR014" (at 165.481 157.48 0)
+    (property "Reference" "#PWR09" (at 165.481 157.48 0)
       (effects (font (size 1.27 1.27)) hide)
     )
     (property "Value" "+5V" (at 165.481 149.725 0)
@@ -3827,25 +3935,25 @@
     (instances
       (project "rp-pico-sensor-shield"
         (path "/01191561-9ded-4746-bfa0-1bc8653df791"
-          (reference "#PWR014") (unit 1)
+          (reference "#PWR09") (unit 1)
         )
       )
     )
   )
 
-  (symbol (lib_id "Connector_Generic:Conn_01x03") (at 241.3 95.758 0) (unit 1)
+  (symbol (lib_id "Connector_Generic:Conn_01x03") (at 241.3 80.899 0) (unit 1)
     (in_bom yes) (on_board yes) (dnp no) (fields_autoplaced)
     (uuid f32ccd66-3719-484d-83d3-a8194f81ece9)
-    (property "Reference" "J27" (at 243.332 94.5459 0)
+    (property "Reference" "J28" (at 243.332 79.6869 0)
       (effects (font (size 1.27 1.27)) (justify left))
     )
-    (property "Value" "Conn_01x03" (at 243.332 96.9701 0)
+    (property "Value" "Conn_01x03" (at 243.332 82.1111 0)
       (effects (font (size 1.27 1.27)) (justify left))
     )
-    (property "Footprint" "Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Horizontal" (at 241.3 95.758 0)
+    (property "Footprint" "Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Horizontal" (at 241.3 80.899 0)
       (effects (font (size 1.27 1.27)) hide)
     )
-    (property "Datasheet" "~" (at 241.3 95.758 0)
+    (property "Datasheet" "~" (at 241.3 80.899 0)
       (effects (font (size 1.27 1.27)) hide)
     )
     (pin "3" (uuid 5968fb15-b580-49c2-be60-aa77c69328e5))
@@ -3854,7 +3962,7 @@
     (instances
       (project "rp-pico-sensor-shield"
         (path "/01191561-9ded-4746-bfa0-1bc8653df791"
-          (reference "J27") (unit 1)
+          (reference "J28") (unit 1)
         )
       )
     )
@@ -3863,7 +3971,7 @@
   (symbol (lib_id "Connector_Generic:Conn_01x04") (at 65.278 111.379 90) (unit 1)
     (in_bom yes) (on_board yes) (dnp no) (fields_autoplaced)
     (uuid f962b90a-2630-46bb-bd4d-39cd51007a05)
-    (property "Reference" "J9" (at 66.548 105.9647 90)
+    (property "Reference" "J8" (at 66.548 105.9647 90)
       (effects (font (size 1.27 1.27)))
     )
     (property "Value" "Conn_01x04" (at 66.548 108.3889 90)
@@ -3882,7 +3990,7 @@
     (instances
       (project "rp-pico-sensor-shield"
         (path "/01191561-9ded-4746-bfa0-1bc8653df791"
-          (reference "J9") (unit 1)
+          (reference "J8") (unit 1)
         )
       )
     )
@@ -3891,7 +3999,7 @@
   (symbol (lib_id "Connector_Generic:Conn_01x04") (at 65.278 136.779 90) (unit 1)
     (in_bom yes) (on_board yes) (dnp no) (fields_autoplaced)
     (uuid f9bd3c8a-571e-4f16-8bb7-57c90e098b75)
-    (property "Reference" "J11" (at 66.548 131.3647 90)
+    (property "Reference" "J10" (at 66.548 131.3647 90)
       (effects (font (size 1.27 1.27)))
     )
     (property "Value" "Conn_01x04" (at 66.548 133.7889 90)
@@ -3910,7 +4018,7 @@
     (instances
       (project "rp-pico-sensor-shield"
         (path "/01191561-9ded-4746-bfa0-1bc8653df791"
-          (reference "J11") (unit 1)
+          (reference "J10") (unit 1)
         )
       )
     )

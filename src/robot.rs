@@ -72,6 +72,12 @@ impl<
         }
     }
 
+    /// Returns a duty value normalized to the max duty of the motor.
+    /// The duty is clamped to the range [0, 1].
+    fn noramlize_duty(&self, duty: f32) -> u16 {
+        (duty.max(0.0).min(1.0) * self.motors.enable_pin_a().get_max_duty() as f32) as u16
+    }
+
     /// returns true if the button 1 is newly pressed
     pub fn button1_pressed(&mut self) -> bool {
         // the button is active low
@@ -103,7 +109,7 @@ impl<
     }
 
     pub fn forward(&mut self, duty: f32) -> &mut Self {
-        let normalized_duty = (duty.max(0.0).min(1.0) * 65535.0) as u16;
+        let normalized_duty = self.noramlize_duty(duty);
         self.motors.set_duty(normalized_duty, normalized_duty);
         self.motors.forward();
         self

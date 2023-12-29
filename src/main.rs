@@ -1,9 +1,7 @@
-//! Blinks the LED on a Pico board
-//!
-//! This will blink an LED attached to GP25, which is the pin the Pico uses for the on-board LED.
 #![no_std]
 #![no_main]
 mod l298n;
+mod model;
 mod robot;
 
 use bsp::{entry, hal::fugit::HertzU32};
@@ -125,6 +123,8 @@ fn main() -> ! {
         robot.stop();
         led_pin.set_low().unwrap();
         delay.delay_ms(1000);
+
+        robot.handle_loop();
     }
 }
 
