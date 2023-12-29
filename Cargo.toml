@@ -29,6 +29,9 @@ rp-pico = "0.8"
 # rp2040-hal = { version="0.9", features=["rt", "critical-section-impl"] }
 # rp2040-boot2 = "0.3"
 
+[dev-dependencies]
+rusty-hook = "^0.11.2"
+
 # cargo build/run
 [profile.dev]
 codegen-units = 1
