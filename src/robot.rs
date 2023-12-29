@@ -18,7 +18,7 @@ pub struct Robot<
     TWI: WriteRead,
 > {
     motors: MotorController<INA1, INA2, INB1, INB2, ENA, ENB>,
-    i2c: TWI,
+    _i2c: TWI,
     button1: BUTT1,
     button2: BUTT2,
     button1_pressed: bool,
@@ -38,6 +38,7 @@ impl<
         TWI: WriteRead,
     > Robot<INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI>
 {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         ina1_pin: INA1,
         ina2_pin: INA2,
@@ -53,7 +54,7 @@ impl<
 
         Self {
             motors,
-            i2c,
+            _i2c: i2c,
             button1: button1_pin,
             button2: button2_pin,
             button1_pressed: false,

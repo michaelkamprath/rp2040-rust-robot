@@ -1,3 +1,4 @@
+#![allow(clippy::comparison_chain)]
 use defmt::{debug, error, Format};
 use micromath::F32Ext;
 

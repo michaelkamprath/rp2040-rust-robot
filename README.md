@@ -5,6 +5,8 @@ _This is a Work in Progress_
 
 This project is a fork of the [rp2040-project-template](https://github.com/rp-rs/rp2040-project-template). See the template's [README.md](https://github.com/rp-rs/rp2040-project-template/blob/main/README.md) for details on how to build the code found here for the RP2040.
 
+## Notes
+Uses [rusty-hook](https://github.com/swellaby/rusty-hook) for precommit hooks.
 
 ## Hardware
 

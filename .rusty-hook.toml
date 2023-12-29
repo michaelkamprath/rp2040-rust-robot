@@ -1,6 +1,6 @@
 [hooks]
-pre-commit = "cargo fmt -- --check"
-pre-push = ["cargo check", "cargo fmt -- --check"]
+pre-commit = "cargo clippy --all-features -- --deny=warnings"
+pre-push = []
 post-commit = "echo yay"
 
 [logging]
