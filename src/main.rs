@@ -3,12 +3,13 @@
 mod l298n;
 mod model;
 mod robot;
+mod system;
 
 use bsp::{
     entry,
     hal::{fugit::HertzU32, gpio},
 };
-use defmt::*;
+use defmt::{info, panic};
 use defmt_rtt as _;
 use embedded_hal::digital::v2::OutputPin;
 use panic_probe as _;
@@ -27,6 +28,7 @@ use bsp::hal::{
 };
 
 use robot::Robot;
+use system::millis::{init_millis, millis};
 
 #[entry]
 fn main() -> ! {
@@ -58,6 +60,12 @@ fn main() -> ! {
         sio.gpio_bank0,
         &mut pac.RESETS,
     );
+
+    // init timer and millis
+    let mut timer = rp_pico::hal::Timer::new(pac.TIMER, &mut pac.RESETS, &clocks);
+    if let Err(_e) = init_millis(&mut timer) {
+        panic!("Error initializing millis");
+    }
 
     // Init & Configure PWMs
     let pwm_slices = Slices::new(pac.PWM, &mut pac.RESETS);
@@ -107,7 +115,7 @@ fn main() -> ! {
     let mut test_pin = pins.gpio2.into_push_pull_output();
 
     loop {
-        info!("on!");
+        info!("on! millis: {}", millis());
         robot.forward(1.0);
         led_pin.set_high().unwrap();
         test_pin.set_high().unwrap();

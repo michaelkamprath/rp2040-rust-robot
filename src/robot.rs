@@ -1,7 +1,7 @@
 use crate::l298n::motor_controller::MotorController;
 use core::cell::{Cell, RefCell};
 use cortex_m::interrupt::Mutex;
-use defmt::info;
+use defmt::{debug, info, trace};
 use embedded_hal::{
     blocking::i2c::WriteRead,
     digital::v2::{InputPin, OutputPin},
@@ -96,6 +96,7 @@ impl<
         }
 
         // return the robot
+        info!("Robot initialized");
         Self {
             motors,
             _i2c: i2c,
@@ -116,6 +117,7 @@ impl<
             self.button2_pressed = false;
         }
     }
+
     /// Resets the wheel counters to 0
     pub fn reset_wheel_counters(&mut self) {
         self.reset_left_wheel_counter();
@@ -157,7 +159,7 @@ impl<
         // the button is active low
         if self.button1.is_low().ok().unwrap() {
             if !self.button1_pressed {
-                info!("robot button 1 pressed");
+                debug!("robot button 1 pressed");
                 self.button1_pressed = true;
                 return true;
             }
@@ -172,7 +174,7 @@ impl<
         // the button is active low
         if self.button2.is_low().ok().unwrap() {
             if !self.button2_pressed {
-                info!("robot button 2 pressed");
+                debug!("robot button 2 pressed");
                 self.button2_pressed = true;
                 return true;
             }
@@ -209,7 +211,7 @@ fn IO_IRQ_BANK0() {
                     .borrow(cs)
                     .set(LEFT_WHEEL_COUNTER.borrow(cs).get() + 1);
                 pin.clear_interrupt(Interrupt::EdgeLow);
-                info!("Left wheel count: {}", LEFT_WHEEL_COUNTER.borrow(cs).get());
+                trace!("Left wheel count: {}", LEFT_WHEEL_COUNTER.borrow(cs).get());
             }
         }
         if let Some(pin) = RIGHT_WHEEL_COUNTER_PIN.borrow(cs).borrow_mut().as_mut() {
@@ -218,7 +220,7 @@ fn IO_IRQ_BANK0() {
                     .borrow(cs)
                     .set(RIGHT_WHEEL_COUNTER.borrow(cs).get() + 1);
                 pin.clear_interrupt(Interrupt::EdgeLow);
-                info!(
+                trace!(
                     "Right wheel count: {}",
                     RIGHT_WHEEL_COUNTER.borrow(cs).get()
                 );
