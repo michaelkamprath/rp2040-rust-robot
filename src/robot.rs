@@ -1,10 +1,35 @@
 use crate::l298n::motor_controller::MotorController;
+use core::cell::{Cell, RefCell};
+use cortex_m::interrupt::Mutex;
 use defmt::info;
 use embedded_hal::{
     blocking::i2c::WriteRead,
     digital::v2::{InputPin, OutputPin},
     PwmPin,
 };
+use rp_pico::hal::gpio;
+use rp_pico::hal::{
+    gpio::{
+        bank0::{Gpio16, Gpio17},
+        FunctionSio, Interrupt, SioInput,
+    },
+    pac::{self, interrupt},
+};
+
+//==============================================================================
+// Interrupt pins and counters for wheel encoders
+//
+type LeftWheelCounterPin = gpio::Pin<Gpio16, FunctionSio<SioInput>, gpio::PullUp>;
+type RightWheelCounterPin = gpio::Pin<Gpio17, FunctionSio<SioInput>, gpio::PullUp>;
+
+static LEFT_WHEEL_COUNTER_PIN: Mutex<RefCell<Option<LeftWheelCounterPin>>> =
+    Mutex::new(RefCell::new(None));
+static RIGHT_WHEEL_COUNTER_PIN: Mutex<RefCell<Option<RightWheelCounterPin>>> =
+    Mutex::new(RefCell::new(None));
+
+static LEFT_WHEEL_COUNTER: Mutex<Cell<u32>> = Mutex::new(Cell::new(0));
+static RIGHT_WHEEL_COUNTER: Mutex<Cell<u32>> = Mutex::new(Cell::new(0));
+//==============================================================================
 
 pub struct Robot<
     INA1: OutputPin,
@@ -49,9 +74,28 @@ impl<
         button1_pin: BUTT1,
         button2_pin: BUTT2,
         i2c: TWI,
+        left_counter_pin: LeftWheelCounterPin,
+        right_counter_pin: RightWheelCounterPin,
     ) -> Self {
+        // create the motor controller
         let motors = MotorController::new(ina1_pin, ina2_pin, inb1_pin, inb2_pin, ena_pin, enb_pin);
 
+        // enable interrupts for wheel encoders
+        cortex_m::interrupt::free(|cs| {
+            left_counter_pin.set_interrupt_enabled(Interrupt::EdgeLow, true);
+            LEFT_WHEEL_COUNTER_PIN
+                .borrow(cs)
+                .replace(Some(left_counter_pin));
+            right_counter_pin.set_interrupt_enabled(Interrupt::EdgeLow, true);
+            RIGHT_WHEEL_COUNTER_PIN
+                .borrow(cs)
+                .replace(Some(right_counter_pin));
+        });
+        unsafe {
+            pac::NVIC::unmask(pac::Interrupt::IO_IRQ_BANK0);
+        }
+
+        // return the robot
         Self {
             motors,
             _i2c: i2c,
@@ -71,6 +115,35 @@ impl<
         if self.button2.is_high().ok().unwrap() {
             self.button2_pressed = false;
         }
+    }
+    /// Resets the wheel counters to 0
+    pub fn reset_wheel_counters(&mut self) {
+        self.reset_left_wheel_counter();
+        self.reset_right_wheel_counter();
+    }
+
+    /// Resets the left wheel counters to 0
+    pub fn reset_left_wheel_counter(&mut self) {
+        cortex_m::interrupt::free(|cs| {
+            LEFT_WHEEL_COUNTER.borrow(cs).set(0);
+        });
+    }
+
+    /// Resets the right wheel counters to 0
+    pub fn reset_right_wheel_counter(&mut self) {
+        cortex_m::interrupt::free(|cs| {
+            RIGHT_WHEEL_COUNTER.borrow(cs).set(0);
+        });
+    }
+
+    /// Returns the number of wheel ticks on the left wheel since the last reset
+    pub fn get_left_wheel_counter(&self) -> u32 {
+        cortex_m::interrupt::free(|cs| LEFT_WHEEL_COUNTER.borrow(cs).get())
+    }
+
+    /// Returns the number of wheel ticks on the right wheel since the last reset
+    pub fn get_right_wheel_counter(&self) -> u32 {
+        cortex_m::interrupt::free(|cs| RIGHT_WHEEL_COUNTER.borrow(cs).get())
     }
 
     /// Returns a duty value normalized to the max duty of the motor.
@@ -111,7 +184,7 @@ impl<
 
     pub fn forward(&mut self, duty: f32) -> &mut Self {
         let normalized_duty = self.noramlize_duty(duty);
-        self.motors.set_duty(normalized_duty, normalized_duty);
+        self.motors.set_duty(normalized_duty / 10, normalized_duty);
         self.motors.forward();
         self
     }
@@ -124,4 +197,32 @@ impl<
         self.motors.set_duty(0, 0);
         self
     }
+}
+
+/// Interrupt handler for the wheel encoders
+#[interrupt]
+fn IO_IRQ_BANK0() {
+    cortex_m::interrupt::free(|cs| {
+        if let Some(pin) = LEFT_WHEEL_COUNTER_PIN.borrow(cs).borrow_mut().as_mut() {
+            if pin.interrupt_status(Interrupt::EdgeLow) {
+                LEFT_WHEEL_COUNTER
+                    .borrow(cs)
+                    .set(LEFT_WHEEL_COUNTER.borrow(cs).get() + 1);
+                pin.clear_interrupt(Interrupt::EdgeLow);
+                info!("Left wheel count: {}", LEFT_WHEEL_COUNTER.borrow(cs).get());
+            }
+        }
+        if let Some(pin) = RIGHT_WHEEL_COUNTER_PIN.borrow(cs).borrow_mut().as_mut() {
+            if pin.interrupt_status(Interrupt::EdgeLow) {
+                RIGHT_WHEEL_COUNTER
+                    .borrow(cs)
+                    .set(RIGHT_WHEEL_COUNTER.borrow(cs).get() + 1);
+                pin.clear_interrupt(Interrupt::EdgeLow);
+                info!(
+                    "Right wheel count: {}",
+                    RIGHT_WHEEL_COUNTER.borrow(cs).get()
+                );
+            }
+        }
+    });
 }

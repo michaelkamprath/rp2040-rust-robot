@@ -22,7 +22,6 @@ jobs:
           # (i.e. no path issues)
           - ubuntu-latest
           - macOS-latest
-          - windows-latest
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v3

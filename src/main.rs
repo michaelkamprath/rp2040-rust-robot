@@ -4,12 +4,14 @@ mod l298n;
 mod model;
 mod robot;
 
-use bsp::{entry, hal::fugit::HertzU32};
+use bsp::{
+    entry,
+    hal::{fugit::HertzU32, gpio},
+};
 use defmt::*;
 use defmt_rtt as _;
 use embedded_hal::digital::v2::OutputPin;
 use panic_probe as _;
-use rp_pico::hal::gpio;
 
 // Provide an alias for our BSP so we can switch targets quickly.
 // Uncomment the BSP you included in Cargo.toml, the rest of the code does not need to change.
@@ -57,9 +59,8 @@ fn main() -> ! {
         &mut pac.RESETS,
     );
 
-    // Init PWMs
+    // Init & Configure PWMs
     let pwm_slices = Slices::new(pac.PWM, &mut pac.RESETS);
-    // Configure PWM
     let mut pwm3 = pwm_slices.pwm3;
 
     pwm3.set_ph_correct();
@@ -91,6 +92,8 @@ fn main() -> ! {
         pins.gpio0.into_pull_up_input(),
         pins.gpio1.into_pull_up_input(),
         i2c,
+        pins.gpio16.into_pull_up_input(),
+        pins.gpio17.into_pull_up_input(),
     );
 
     info!("robot controller created");
@@ -101,11 +104,13 @@ fn main() -> ! {
     // a Pico W and want to toggle a LED with a simple GPIO output pin, you can connect an external
     // LED to one of the GPIO pins, and reference that pin here.
     let mut led_pin = pins.led.into_push_pull_output();
+    let mut test_pin = pins.gpio2.into_push_pull_output();
 
     loop {
         info!("on!");
-        robot.forward(0.1);
+        robot.forward(1.0);
         led_pin.set_high().unwrap();
+        test_pin.set_high().unwrap();
         delay.delay_ms(250);
         led_pin.set_low().unwrap();
         delay.delay_ms(100);
@@ -122,10 +127,9 @@ fn main() -> ! {
         info!("off!");
         robot.stop();
         led_pin.set_low().unwrap();
+        test_pin.set_low().unwrap();
         delay.delay_ms(1000);
 
         robot.handle_loop();
     }
 }
-
-// End of file

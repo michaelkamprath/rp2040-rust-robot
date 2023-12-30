@@ -1,6 +1,6 @@
 [hooks]
 pre-commit = "cargo fmt -- --color always --files-with-diff;  cargo clippy --all-features -- --deny=warnings"
-pre-push = "cargo fmt -- --check"
+pre-push = "cargo fmt -- --check --color always --files-with-diff"
 post-commit = ""
 
 [logging]
