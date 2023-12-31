@@ -17,7 +17,11 @@ embedded-hal = { version = "0.2", features = ["unproven"] }
 defmt = "0.3"
 defmt-rtt = "0.4"
 panic-probe = { version = "0.3", features = ["print-defmt"] }
-micromath = "2.1"
+micromath = { version = "2.1", features = ["vector"] }
+mpu6050 = { git = "https://github.com/michaelkamprath/mpu6050.git", branch = "micromath", features = [
+    "defmt",
+] }
+embedded-alloc = "0.5"
 
 # We're using a Pico by default on this template
 rp-pico = "0.8"
@@ -80,3 +84,6 @@ debug-assertions = false
 incremental = false
 lto = 'fat'
 opt-level = 3
+
+[patch."https://github.com/michaelkamprath/mpu6050.git"]
+mpu6050 = { path = "../mpu6050" }

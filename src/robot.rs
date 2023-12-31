@@ -1,9 +1,10 @@
-use crate::l298n::motor_controller::MotorController;
+use crate::{l298n::motor_controller::MotorController, model::heading::HeadingCalculator};
+use alloc::rc::Rc;
 use core::cell::{Cell, RefCell};
-use cortex_m::interrupt::Mutex;
+use cortex_m::{delay::Delay, interrupt::Mutex};
 use defmt::{debug, info, trace};
 use embedded_hal::{
-    blocking::i2c::WriteRead,
+    blocking::i2c::{Write, WriteRead},
     digital::v2::{InputPin, OutputPin},
     PwmPin,
 };
@@ -40,17 +41,18 @@ pub struct Robot<
     ENB: PwmPin<Duty = u16>,
     BUTT1: InputPin,
     BUTT2: InputPin,
-    TWI: WriteRead,
+    TWI,
 > {
     motors: MotorController<INA1, INA2, INB1, INB2, ENA, ENB>,
-    _i2c: TWI,
     button1: BUTT1,
     button2: BUTT2,
     button1_pressed: bool,
     button2_pressed: bool,
+    _i2c: Rc<RefCell<TWI>>,
+    pub heading_calculator: HeadingCalculator<TWI>,
 }
 
-#[allow(dead_code)]
+#[allow(dead_code, non_camel_case_types)]
 impl<
         INA1: OutputPin,
         INA2: OutputPin,
@@ -60,8 +62,11 @@ impl<
         ENB: PwmPin<Duty = u16>,
         BUTT1: InputPin,
         BUTT2: InputPin,
-        TWI: WriteRead,
+        TWI,
+        TWI_ERR,
     > Robot<INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI>
+where
+    TWI: Write<Error = TWI_ERR> + WriteRead<Error = TWI_ERR>,
 {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
@@ -76,6 +81,7 @@ impl<
         i2c: TWI,
         left_counter_pin: LeftWheelCounterPin,
         right_counter_pin: RightWheelCounterPin,
+        delay: &mut Delay,
     ) -> Self {
         // create the motor controller
         let motors = MotorController::new(ina1_pin, ina2_pin, inb1_pin, inb2_pin, ena_pin, enb_pin);
@@ -94,16 +100,21 @@ impl<
         unsafe {
             pac::NVIC::unmask(pac::Interrupt::IO_IRQ_BANK0);
         }
+        let i2c_shared = Rc::new(RefCell::new(i2c));
+
+        let mut heading_calculator = HeadingCalculator::new(&i2c_shared, delay);
+        heading_calculator.reset();
 
         // return the robot
         info!("Robot initialized");
         Self {
             motors,
-            _i2c: i2c,
             button1: button1_pin,
             button2: button2_pin,
             button1_pressed: false,
             button2_pressed: false,
+            _i2c: i2c_shared,
+            heading_calculator,
         }
     }
 
@@ -116,6 +127,8 @@ impl<
         if self.button2.is_high().ok().unwrap() {
             self.button2_pressed = false;
         }
+
+        self.heading_calculator.update();
     }
 
     /// Resets the wheel counters to 0
@@ -191,7 +204,9 @@ impl<
         self
     }
 
-    pub fn straight(&mut self, _distance_mm: u32) -> &mut Self {
+    pub fn straight(&mut self, distance_mm: u32) -> &mut Self {
+        info!("Robot move straight, distance = {}", distance_mm);
+
         self
     }
 

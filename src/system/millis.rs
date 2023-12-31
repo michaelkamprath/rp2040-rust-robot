@@ -10,6 +10,7 @@ use rp_pico::hal::{
 static MILLIS_ALARM: Mutex<RefCell<Option<Alarm0>>> = Mutex::new(RefCell::new(None));
 static MILLIS_COUNT: Mutex<Cell<u32>> = Mutex::new(Cell::new(0));
 
+/// Initialize the millis timer. This will enable the `TIMER_IRQ_0` interrupt and consumes the `Alarm0` alarm.
 pub fn init_millis(timer: &mut Timer) -> Result<(), ScheduleAlarmError> {
     cortex_m::interrupt::free(|cs| {
         let mut alarm0 = timer.alarm_0().unwrap();
@@ -25,6 +26,7 @@ pub fn init_millis(timer: &mut Timer) -> Result<(), ScheduleAlarmError> {
     Ok(())
 }
 
+/// Get the current millis count.
 pub fn millis() -> u32 {
     cortex_m::interrupt::free(|cs| MILLIS_COUNT.borrow(cs).get())
 }

@@ -19,6 +19,13 @@ use panic_probe as _;
 use rp_pico as bsp;
 // use sparkfun_pro_micro_rp2040 as bsp;
 
+extern crate alloc;
+
+use embedded_alloc::Heap;
+
+#[global_allocator]
+static HEAP: Heap = Heap::empty();
+
 use bsp::hal::{
     clocks::{init_clocks_and_plls, Clock},
     pac,
@@ -32,6 +39,14 @@ use system::millis::{init_millis, millis};
 
 #[entry]
 fn main() -> ! {
+    // Initialize the allocator BEFORE you use it
+    {
+        use core::mem::MaybeUninit;
+        const HEAP_SIZE: usize = 4048;
+        static mut HEAP_MEM: [MaybeUninit<u8>; HEAP_SIZE] = [MaybeUninit::uninit(); HEAP_SIZE];
+        unsafe { HEAP.init(HEAP_MEM.as_ptr() as usize, HEAP_SIZE) }
+    }
+
     info!("Program start");
     let mut pac = pac::Peripherals::take().unwrap();
     let core = pac::CorePeripherals::take().unwrap();
@@ -102,6 +117,7 @@ fn main() -> ! {
         i2c,
         pins.gpio16.into_pull_up_input(),
         pins.gpio17.into_pull_up_input(),
+        &mut delay,
     );
 
     info!("robot controller created");
@@ -115,23 +131,35 @@ fn main() -> ! {
     let mut test_pin = pins.gpio2.into_push_pull_output();
 
     loop {
-        info!("on! millis: {}", millis());
+        info!(
+            "on! millis: {}, heading: {}",
+            millis(),
+            robot.heading_calculator.heading()
+        );
         robot.forward(1.0);
         led_pin.set_high().unwrap();
         test_pin.set_high().unwrap();
         delay.delay_ms(250);
+        robot.handle_loop();
         led_pin.set_low().unwrap();
         delay.delay_ms(100);
+        robot.handle_loop();
         led_pin.set_high().unwrap();
         delay.delay_ms(250);
+        robot.handle_loop();
         led_pin.set_low().unwrap();
         delay.delay_ms(100);
+        robot.handle_loop();
         led_pin.set_high().unwrap();
         delay.delay_ms(250);
+        robot.handle_loop();
         led_pin.set_low().unwrap();
         delay.delay_ms(100);
+        robot.handle_loop();
         led_pin.set_high().unwrap();
         delay.delay_ms(250);
+        robot.handle_loop();
+
         info!("off!");
         robot.stop();
         led_pin.set_low().unwrap();
