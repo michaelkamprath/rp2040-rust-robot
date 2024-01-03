@@ -20,6 +20,7 @@ panic-probe = { version = "0.3", features = ["print-defmt"] }
 micromath = { version = "2.1", features = ["vector"] }
 mpu6050 = { git = "https://github.com/michaelkamprath/mpu6050.git", branch = "micromath", features = [
     "defmt",
+    "shared_i2c",
 ] }
 embedded-alloc = "0.5"
 
