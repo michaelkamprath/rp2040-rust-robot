@@ -23,6 +23,9 @@ mpu6050 = { git = "https://github.com/michaelkamprath/mpu6050.git", branch = "mi
     "shared_i2c",
 ] }
 embedded-alloc = "0.5"
+adafruit-lcd-backpack = { git = "https://github.com/michaelkamprath/adafruit-lcd-backpack-rust.git", features = [
+    "shared_i2c",
+] }
 
 # We're using a Pico by default on this template
 rp-pico = "0.8"
@@ -88,3 +91,6 @@ opt-level = 3
 
 # [patch."https://github.com/michaelkamprath/mpu6050.git"]
 # mpu6050 = { path = "../mpu6050" }
+
+[patch."https://github.com/michaelkamprath/adafruit-lcd-backpack-rust.git"]
+adafruit-lcd-backpack = { path = "../adafruit-lcd-backpack-rust" }

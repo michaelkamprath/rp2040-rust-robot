@@ -1,9 +1,14 @@
+#![allow(non_camel_case_types, dead_code)]
+
 use crate::{l298n::motor_controller::MotorController, model::heading::HeadingCalculator};
+use adafruit_lcd_backpack::LcdBackpack;
 use alloc::rc::Rc;
 use core::cell::{Cell, RefCell};
-use cortex_m::{delay::Delay, interrupt::Mutex};
-use defmt::{debug, info, trace};
+use cortex_m::interrupt::Mutex;
+use defmt::{debug, error, info};
+use defmt::{write, Format};
 use embedded_hal::{
+    blocking::delay::{DelayMs, DelayUs},
     blocking::i2c::{Write, WriteRead},
     digital::v2::{InputPin, OutputPin},
     PwmPin,
@@ -11,7 +16,7 @@ use embedded_hal::{
 use rp_pico::hal::gpio;
 use rp_pico::hal::{
     gpio::{
-        bank0::{Gpio16, Gpio17},
+        bank0::{Gpio16, Gpio22},
         FunctionSio, Interrupt, SioInput,
     },
     pac::{self, interrupt},
@@ -21,7 +26,7 @@ use rp_pico::hal::{
 // Interrupt pins and counters for wheel encoders
 //
 type LeftWheelCounterPin = gpio::Pin<Gpio16, FunctionSio<SioInput>, gpio::PullUp>;
-type RightWheelCounterPin = gpio::Pin<Gpio17, FunctionSio<SioInput>, gpio::PullUp>;
+type RightWheelCounterPin = gpio::Pin<Gpio22, FunctionSio<SioInput>, gpio::PullUp>;
 
 static LEFT_WHEEL_COUNTER_PIN: Mutex<RefCell<Option<LeftWheelCounterPin>>> =
     Mutex::new(RefCell::new(None));
@@ -31,6 +36,16 @@ static RIGHT_WHEEL_COUNTER_PIN: Mutex<RefCell<Option<RightWheelCounterPin>>> =
 static LEFT_WHEEL_COUNTER: Mutex<Cell<u32>> = Mutex::new(Cell::new(0));
 static RIGHT_WHEEL_COUNTER: Mutex<Cell<u32>> = Mutex::new(Cell::new(0));
 //==============================================================================
+
+//==============================================================================
+// Constants for the robot
+//
+const WHEEL_DIAMETER: f32 = 65.0; // mm
+const WHEEL_CIRCUMFERENCE: f32 = WHEEL_DIAMETER * core::f32::consts::PI;
+const MOTOR_REDUCTION_RATIO: f32 = 46.8;
+const ENCODER_TICKS_PER_REVOLUTION: f32 = 11.0;
+const WHEEL_TICKS_PER_REVOLUTION: f32 = ENCODER_TICKS_PER_REVOLUTION * MOTOR_REDUCTION_RATIO;
+const WHEEL_TICKS_PER_MM: f32 = WHEEL_TICKS_PER_REVOLUTION / WHEEL_CIRCUMFERENCE;
 
 pub struct Robot<
     INA1: OutputPin,
@@ -42,6 +57,7 @@ pub struct Robot<
     BUTT1: InputPin,
     BUTT2: InputPin,
     TWI,
+    DELAY,
 > {
     motors: MotorController<INA1, INA2, INB1, INB2, ENA, ENB>,
     button1: BUTT1,
@@ -49,7 +65,8 @@ pub struct Robot<
     button1_pressed: bool,
     button2_pressed: bool,
     _i2c: Rc<RefCell<TWI>>,
-    pub heading_calculator: HeadingCalculator<TWI>,
+    pub heading_calculator: HeadingCalculator<TWI, DELAY>,
+    lcd: LcdBackpack<TWI, DELAY>,
 }
 
 #[allow(dead_code, non_camel_case_types)]
@@ -64,9 +81,11 @@ impl<
         BUTT2: InputPin,
         TWI,
         TWI_ERR,
-    > Robot<INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI>
+        DELAY,
+    > Robot<INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI, DELAY>
 where
     TWI: Write<Error = TWI_ERR> + WriteRead<Error = TWI_ERR>,
+    DELAY: DelayMs<u16> + DelayUs<u16> + DelayMs<u8>,
 {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
@@ -81,7 +100,7 @@ where
         i2c: TWI,
         left_counter_pin: LeftWheelCounterPin,
         right_counter_pin: RightWheelCounterPin,
-        delay: &mut Delay,
+        delay_shared: &mut Rc<RefCell<DELAY>>,
     ) -> Self {
         // create the motor controller
         let motors = MotorController::new(ina1_pin, ina2_pin, inb1_pin, inb2_pin, ena_pin, enb_pin);
@@ -102,8 +121,19 @@ where
         }
         let i2c_shared = Rc::new(RefCell::new(i2c));
 
-        let mut heading_calculator = HeadingCalculator::new(&i2c_shared, delay);
+        let mut heading_calculator = HeadingCalculator::new(&i2c_shared, delay_shared);
         heading_calculator.reset();
+
+        let mut lcd = LcdBackpack::new(&i2c_shared, delay_shared);
+        match lcd.init() {
+            Ok(_) => {
+                info!("LCD initialized");
+            }
+            Err(_) => {
+                error!("Error initializing LCD:");
+            }
+        };
+        lcd.print("Hellorld!").ok();
 
         // return the robot
         info!("Robot initialized");
@@ -115,6 +145,7 @@ where
             button2_pressed: false,
             _i2c: i2c_shared,
             heading_calculator,
+            lcd,
         }
     }
 
@@ -128,7 +159,13 @@ where
             self.button2_pressed = false;
         }
 
-        self.heading_calculator.update();
+        // self.heading_calculator.update();
+    }
+
+    pub fn display_text(&mut self, text: &str) {
+        self.lcd.clear().ok();
+        self.lcd.set_cursor(0, 0).ok();
+        self.lcd.print(text).ok();
     }
 
     /// Resets the wheel counters to 0
@@ -199,7 +236,7 @@ where
 
     pub fn forward(&mut self, duty: f32) -> &mut Self {
         let normalized_duty = self.noramlize_duty(duty);
-        self.motors.set_duty(normalized_duty / 10, normalized_duty);
+        self.motors.set_duty(normalized_duty, normalized_duty);
         self.motors.forward();
         self
     }
@@ -214,6 +251,72 @@ where
         self.motors.set_duty(0, 0);
         self
     }
+
+    //--------------------------------------------------------------------------
+    // LCD functions
+
+    /// clears the robot's LCD Screen
+    pub fn clear_lcd(&mut self) -> &mut Self {
+        self.lcd.clear().ok();
+        self
+    }
+
+    /// set the cursor on the robot's LCD cursor
+    pub fn set_lcd_cursor(&mut self, col: u8, row: u8) -> &mut Self {
+        self.lcd.set_cursor(col, row).ok();
+        self
+    }
+}
+
+/// Implements the defmt::Format trait for the Robot struct, allowing the Robot object to be printed with defmt
+impl<
+        INA1: OutputPin,
+        INA2: OutputPin,
+        INB1: OutputPin,
+        INB2: OutputPin,
+        ENA: PwmPin<Duty = u16>,
+        ENB: PwmPin<Duty = u16>,
+        BUTT1: InputPin,
+        BUTT2: InputPin,
+        TWI,
+        TWI_ERR,
+        DELAY,
+    > Format for Robot<INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI, DELAY>
+where
+    TWI: Write<Error = TWI_ERR> + WriteRead<Error = TWI_ERR>,
+    DELAY: DelayMs<u16> + DelayUs<u16> + DelayMs<u8>,
+{
+    fn format(&self, f: defmt::Formatter) {
+        write!(
+            f,
+            "Robot< left = {}, right = {} >",
+            self.get_left_wheel_counter(),
+            self.get_right_wheel_counter()
+        );
+    }
+}
+
+/// Implement the `core::fmt::Write` trait for the robot, allowing us to use the `write!` macro
+impl<
+        INA1: OutputPin,
+        INA2: OutputPin,
+        INB1: OutputPin,
+        INB2: OutputPin,
+        ENA: PwmPin<Duty = u16>,
+        ENB: PwmPin<Duty = u16>,
+        BUTT1: InputPin,
+        BUTT2: InputPin,
+        TWI,
+        TWI_ERR,
+        DELAY,
+    > core::fmt::Write for Robot<INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI, DELAY>
+where
+    TWI: Write<Error = TWI_ERR> + WriteRead<Error = TWI_ERR>,
+    DELAY: DelayMs<u16> + DelayUs<u16> + DelayMs<u8>,
+{
+    fn write_str(&mut self, s: &str) -> Result<(), core::fmt::Error> {
+        self.lcd.write_str(s)
+    }
 }
 
 /// Interrupt handler for the wheel encoders
@@ -226,7 +329,6 @@ fn IO_IRQ_BANK0() {
                     .borrow(cs)
                     .set(LEFT_WHEEL_COUNTER.borrow(cs).get() + 1);
                 pin.clear_interrupt(Interrupt::EdgeLow);
-                trace!("Left wheel count: {}", LEFT_WHEEL_COUNTER.borrow(cs).get());
             }
         }
         if let Some(pin) = RIGHT_WHEEL_COUNTER_PIN.borrow(cs).borrow_mut().as_mut() {
@@ -235,10 +337,6 @@ fn IO_IRQ_BANK0() {
                     .borrow(cs)
                     .set(RIGHT_WHEEL_COUNTER.borrow(cs).get() + 1);
                 pin.clear_interrupt(Interrupt::EdgeLow);
-                trace!(
-                    "Right wheel count: {}",
-                    RIGHT_WHEEL_COUNTER.borrow(cs).get()
-                );
             }
         }
     });

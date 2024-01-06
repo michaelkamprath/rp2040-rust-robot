@@ -5,10 +5,12 @@ mod model;
 mod robot;
 mod system;
 
+use alloc::rc::Rc;
 use bsp::{
     entry,
     hal::{fugit::HertzU32, gpio},
 };
+use core::{cell::RefCell, fmt::Write};
 use defmt::{info, panic};
 use defmt_rtt as _;
 use embedded_hal::digital::v2::OutputPin;
@@ -67,7 +69,10 @@ fn main() -> ! {
     .ok()
     .unwrap();
 
-    let mut delay = cortex_m::delay::Delay::new(core.SYST, clocks.system_clock.freq().to_Hz());
+    let mut delay_shared = Rc::new(RefCell::new(cortex_m::delay::Delay::new(
+        core.SYST,
+        clocks.system_clock.freq().to_Hz(),
+    )));
 
     let pins = bsp::Pins::new(
         pac.IO_BANK0,
@@ -84,16 +89,16 @@ fn main() -> ! {
 
     // Init & Configure PWMs
     let pwm_slices = Slices::new(pac.PWM, &mut pac.RESETS);
-    let mut pwm3 = pwm_slices.pwm3;
+    let mut pwm4 = pwm_slices.pwm4;
 
-    pwm3.set_ph_correct();
-    pwm3.enable();
+    pwm4.set_ph_correct();
+    pwm4.enable();
 
-    let mut channel_a = pwm3.channel_a;
-    let mut channel_b = pwm3.channel_b;
+    let mut channel_a = pwm4.channel_a;
+    let mut channel_b = pwm4.channel_b;
 
-    channel_a.output_to(pins.gpio6);
-    channel_b.output_to(pins.gpio7);
+    channel_a.output_to(pins.gpio8);
+    channel_b.output_to(pins.gpio9);
 
     // set up I2C
     let i2c = bsp::hal::I2C::new_controller(
@@ -106,18 +111,18 @@ fn main() -> ! {
     );
 
     let mut robot = Robot::new(
-        pins.gpio8.into_push_pull_output(),
-        pins.gpio9.into_push_pull_output(),
         pins.gpio10.into_push_pull_output(),
         pins.gpio11.into_push_pull_output(),
+        pins.gpio13.into_push_pull_output(),
+        pins.gpio12.into_push_pull_output(),
         channel_a,
         channel_b,
-        pins.gpio0.into_pull_up_input(),
-        pins.gpio1.into_pull_up_input(),
+        pins.gpio18.into_pull_up_input(),
+        pins.gpio19.into_pull_up_input(),
         i2c,
         pins.gpio16.into_pull_up_input(),
-        pins.gpio17.into_pull_up_input(),
-        &mut delay,
+        pins.gpio22.into_pull_up_input(),
+        &mut delay_shared,
     );
 
     info!("robot controller created");
@@ -128,44 +133,59 @@ fn main() -> ! {
     // a Pico W and want to toggle a LED with a simple GPIO output pin, you can connect an external
     // LED to one of the GPIO pins, and reference that pin here.
     let mut led_pin = pins.led.into_push_pull_output();
-    let mut test_pin = pins.gpio2.into_push_pull_output();
 
     loop {
-        info!(
-            "on! millis: {}, heading: {}",
-            millis(),
-            robot.heading_calculator.heading()
-        );
+        let millis = millis();
+        info!("on! millis: {}", millis,);
+        robot.reset_wheel_counters();
+        let heading = robot.heading_calculator.heading();
+        write!(
+            robot.clear_lcd().set_lcd_cursor(0, 0),
+            "heading: {}",
+            heading,
+        )
+        .ok();
         robot.forward(1.0);
         led_pin.set_high().unwrap();
-        test_pin.set_high().unwrap();
-        delay.delay_ms(250);
-        robot.handle_loop();
-        led_pin.set_low().unwrap();
-        delay.delay_ms(100);
-        robot.handle_loop();
-        led_pin.set_high().unwrap();
-        delay.delay_ms(250);
-        robot.handle_loop();
-        led_pin.set_low().unwrap();
-        delay.delay_ms(100);
-        robot.handle_loop();
-        led_pin.set_high().unwrap();
-        delay.delay_ms(250);
-        robot.handle_loop();
-        led_pin.set_low().unwrap();
-        delay.delay_ms(100);
-        robot.handle_loop();
-        led_pin.set_high().unwrap();
-        delay.delay_ms(250);
-        robot.handle_loop();
+        loop_delay(&mut delay_shared, 2000, || {
+            robot.handle_loop();
+        });
 
-        info!("off!");
         robot.stop();
         led_pin.set_low().unwrap();
-        test_pin.set_low().unwrap();
-        delay.delay_ms(1000);
+        loop_delay(&mut delay_shared, 500, || {
+            robot.handle_loop();
+        });
+        info!("off ===> {}", robot);
+        let left_wheel_counter = robot.get_left_wheel_counter();
+        let right_wheel_counter = robot.get_right_wheel_counter();
+        write!(
+            robot.set_lcd_cursor(0, 1),
+            "l: {} r: {}",
+            left_wheel_counter,
+            right_wheel_counter,
+        )
+        .ok();
+        loop_delay(&mut delay_shared, 1000, || {
+            robot.handle_loop();
+        });
 
         robot.handle_loop();
+    }
+}
+
+fn loop_delay<F>(
+    delayer: &mut Rc<RefCell<impl embedded_hal::blocking::delay::DelayMs<u32>>>,
+    delay_ms: u32,
+    mut f: F,
+) where
+    F: FnMut(),
+{
+    // we want to call f() at least every 25 ms
+    let start_millis = millis();
+    while millis() - start_millis < delay_ms {
+        f();
+        let next_loop_delay = (delay_ms - (millis() - start_millis)).max(1).min(25);
+        delayer.borrow_mut().delay_ms(next_loop_delay);
     }
 }
