@@ -2,4 +2,5 @@
   (version 7)
   (lib (name "MCU_RaspberryPi_and_Boards")(type "KiCad")(uri "${KIPRJMOD}/KiCad-RP-Pico/RP-Pico Libraries/MCU_RaspberryPi_and_Boards.pretty")(options "")(descr ""))
   (lib (name "SM04B-SRSS-TB")(type "KiCad")(uri "${KIPRJMOD}/SM04B-SRSS-TB.pretty")(options "")(descr ""))
+  (lib (name "CONN2_1760510000_WED")(type "KiCad")(uri "${KIPRJMOD}/CONN2_1760510000_WED.pretty")(options "")(descr ""))
 )
