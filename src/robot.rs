@@ -1,7 +1,7 @@
 #![allow(non_camel_case_types, dead_code)]
 
 use crate::{l298n::motor_controller::MotorController, model::heading::HeadingCalculator};
-use adafruit_lcd_backpack::LcdBackpack;
+use adafruit_lcd_backpack::{LcdBackpack, LcdDisplayType};
 use alloc::rc::Rc;
 use core::cell::{Cell, RefCell};
 use cortex_m::interrupt::Mutex;
@@ -124,7 +124,7 @@ where
         let mut heading_calculator = HeadingCalculator::new(&i2c_shared, delay_shared);
         heading_calculator.reset();
 
-        let mut lcd = LcdBackpack::new(&i2c_shared, delay_shared);
+        let mut lcd = LcdBackpack::new(LcdDisplayType::Lcd16x2, &i2c_shared, delay_shared);
         match lcd.init() {
             Ok(_) => {
                 info!("LCD initialized");
