@@ -25,6 +25,7 @@ mpu6050 = { git = "https://github.com/michaelkamprath/mpu6050.git", branch = "mi
 embedded-alloc = "0.5"
 adafruit-lcd-backpack = { git = "https://github.com/michaelkamprath/adafruit-lcd-backpack-rust.git", features = [
     "shared_i2c",
+    "defmt",
 ] }
 
 # We're using a Pico by default on this template
@@ -34,7 +35,11 @@ rp-pico = "0.8"
 # sparkfun-pro-micro-rp2040 = "0.7"
 
 # If you're not going to use a Board Support Package you'll need these:
-# rp2040-hal = { version="0.9", features=["rt", "critical-section-impl"] }
+rp2040-hal = { version = "0.9", features = [
+    "rt",
+    "critical-section-impl",
+    "defmt",
+] }
 # rp2040-boot2 = "0.3"
 
 # cargo build/run
@@ -92,5 +97,5 @@ opt-level = 3
 # [patch."https://github.com/michaelkamprath/mpu6050.git"]
 # mpu6050 = { path = "../mpu6050" }
 
-# [patch."https://github.com/michaelkamprath/adafruit-lcd-backpack-rust.git"]
-# adafruit-lcd-backpack = { path = "../adafruit-lcd-backpack-rust" }
+[patch."https://github.com/michaelkamprath/adafruit-lcd-backpack-rust.git"]
+adafruit-lcd-backpack = { path = "../adafruit-lcd-backpack-rust" }

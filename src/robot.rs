@@ -1,11 +1,15 @@
 #![allow(non_camel_case_types, dead_code)]
+mod debouncer;
 
-use crate::{l298n::motor_controller::MotorController, model::heading::HeadingCalculator};
-use adafruit_lcd_backpack::LcdBackpack;
+use crate::{
+    l298n::motor_controller::MotorController, model::heading::HeadingCalculator,
+    robot::debouncer::DebouncedButton,
+};
+use adafruit_lcd_backpack::{LcdBackpack, LcdDisplayType};
 use alloc::rc::Rc;
 use core::cell::{Cell, RefCell};
 use cortex_m::interrupt::Mutex;
-use defmt::{debug, error, info};
+use defmt::{error, info};
 use defmt::{write, Format};
 use embedded_hal::{
     blocking::delay::{DelayMs, DelayUs},
@@ -47,6 +51,7 @@ const ENCODER_TICKS_PER_REVOLUTION: f32 = 11.0;
 const WHEEL_TICKS_PER_REVOLUTION: f32 = ENCODER_TICKS_PER_REVOLUTION * MOTOR_REDUCTION_RATIO;
 const WHEEL_TICKS_PER_MM: f32 = WHEEL_TICKS_PER_REVOLUTION / WHEEL_CIRCUMFERENCE;
 
+const BUTTON_DEBOUNCE_TIME_MS: u32 = 10;
 pub struct Robot<
     INA1: OutputPin,
     INA2: OutputPin,
@@ -60,10 +65,8 @@ pub struct Robot<
     DELAY,
 > {
     motors: MotorController<INA1, INA2, INB1, INB2, ENA, ENB>,
-    button1: BUTT1,
-    button2: BUTT2,
-    button1_pressed: bool,
-    button2_pressed: bool,
+    button1: DebouncedButton<BUTT1, false, BUTTON_DEBOUNCE_TIME_MS>,
+    button2: DebouncedButton<BUTT2, false, BUTTON_DEBOUNCE_TIME_MS>,
     _i2c: Rc<RefCell<TWI>>,
     pub heading_calculator: HeadingCalculator<TWI, DELAY>,
     lcd: LcdBackpack<TWI, DELAY>,
@@ -85,6 +88,7 @@ impl<
     > Robot<INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI, DELAY>
 where
     TWI: Write<Error = TWI_ERR> + WriteRead<Error = TWI_ERR>,
+    TWI_ERR: defmt::Format,
     DELAY: DelayMs<u16> + DelayUs<u16> + DelayMs<u8>,
 {
     #[allow(clippy::too_many_arguments)]
@@ -124,13 +128,13 @@ where
         let mut heading_calculator = HeadingCalculator::new(&i2c_shared, delay_shared);
         heading_calculator.reset();
 
-        let mut lcd = LcdBackpack::new(&i2c_shared, delay_shared);
+        let mut lcd = LcdBackpack::new(LcdDisplayType::Lcd16x2, &i2c_shared, delay_shared);
         match lcd.init() {
             Ok(_) => {
                 info!("LCD initialized");
             }
-            Err(_) => {
-                error!("Error initializing LCD:");
+            Err(e) => {
+                error!("Error initializing LCD: {}", e);
             }
         };
         lcd.print("Hellorld!").ok();
@@ -139,10 +143,8 @@ where
         info!("Robot initialized");
         Self {
             motors,
-            button1: button1_pin,
-            button2: button2_pin,
-            button1_pressed: false,
-            button2_pressed: false,
+            button1: DebouncedButton::<BUTT1, false, BUTTON_DEBOUNCE_TIME_MS>::new(button1_pin),
+            button2: DebouncedButton::<BUTT2, false, BUTTON_DEBOUNCE_TIME_MS>::new(button2_pin),
             _i2c: i2c_shared,
             heading_calculator,
             lcd,
@@ -152,12 +154,8 @@ where
     /// This function is called in the main loop to allow the robot to handle state updates
     pub fn handle_loop(&mut self) {
         // unset button press if button is not pressed
-        if self.button1.is_high().ok().unwrap() {
-            self.button1_pressed = false;
-        }
-        if self.button2.is_high().ok().unwrap() {
-            self.button2_pressed = false;
-        }
+        self.button1.handle_loop();
+        self.button2.handle_loop();
 
         // self.heading_calculator.update();
     }
@@ -206,32 +204,12 @@ where
 
     /// returns true if the button 1 is newly pressed
     pub fn button1_pressed(&mut self) -> bool {
-        // the button is active low
-        if self.button1.is_low().ok().unwrap() {
-            if !self.button1_pressed {
-                debug!("robot button 1 pressed");
-                self.button1_pressed = true;
-                return true;
-            }
-        } else {
-            self.button1_pressed = false;
-        }
-        false
+        self.button1.is_newly_pressed()
     }
 
     /// returns true if the button 2 is newly pressed
     pub fn button2_pressed(&mut self) -> bool {
-        // the button is active low
-        if self.button2.is_low().ok().unwrap() {
-            if !self.button2_pressed {
-                debug!("robot button 2 pressed");
-                self.button2_pressed = true;
-                return true;
-            }
-        } else {
-            self.button2_pressed = false;
-        }
-        false
+        self.button2.is_newly_pressed()
     }
 
     pub fn forward(&mut self, duty: f32) -> &mut Self {
@@ -284,6 +262,7 @@ impl<
     > Format for Robot<INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI, DELAY>
 where
     TWI: Write<Error = TWI_ERR> + WriteRead<Error = TWI_ERR>,
+    TWI_ERR: defmt::Format,
     DELAY: DelayMs<u16> + DelayUs<u16> + DelayMs<u8>,
 {
     fn format(&self, f: defmt::Formatter) {
@@ -312,6 +291,7 @@ impl<
     > core::fmt::Write for Robot<INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI, DELAY>
 where
     TWI: Write<Error = TWI_ERR> + WriteRead<Error = TWI_ERR>,
+    TWI_ERR: defmt::Format,
     DELAY: DelayMs<u16> + DelayUs<u16> + DelayMs<u8>,
 {
     fn write_str(&mut self, s: &str) -> Result<(), core::fmt::Error> {

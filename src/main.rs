@@ -135,41 +135,48 @@ fn main() -> ! {
     let mut led_pin = pins.led.into_push_pull_output();
 
     loop {
-        let millis = millis();
-        info!("on! millis: {}", millis,);
-        robot.reset_wheel_counters();
-        let heading = robot.heading_calculator.heading();
-        write!(
-            robot.clear_lcd().set_lcd_cursor(0, 0),
-            "heading: {}",
-            heading,
-        )
-        .ok();
-        robot.forward(1.0);
-        led_pin.set_high().unwrap();
-        loop_delay(&mut delay_shared, 2000, || {
-            robot.handle_loop();
-        });
+        if robot.button1_pressed() {
+            info!("button1 pressed");
+            robot.reset_wheel_counters();
+            let heading = robot.heading_calculator.heading();
+            write!(
+                robot.clear_lcd().set_lcd_cursor(0, 0),
+                "heading: {}",
+                heading,
+            )
+            .ok();
+            robot.forward(1.0);
+            led_pin.set_high().unwrap();
+            loop_delay(&mut delay_shared, 2000, || {
+                robot.handle_loop();
+            });
 
-        robot.stop();
-        led_pin.set_low().unwrap();
-        loop_delay(&mut delay_shared, 500, || {
-            robot.handle_loop();
-        });
-        info!("off ===> {}", robot);
-        let left_wheel_counter = robot.get_left_wheel_counter();
-        let right_wheel_counter = robot.get_right_wheel_counter();
-        write!(
-            robot.set_lcd_cursor(0, 1),
-            "l: {} r: {}",
-            left_wheel_counter,
-            right_wheel_counter,
-        )
-        .ok();
-        loop_delay(&mut delay_shared, 1000, || {
-            robot.handle_loop();
-        });
+            robot.stop();
+            led_pin.set_low().unwrap();
+            loop_delay(&mut delay_shared, 500, || {
+                robot.handle_loop();
+            });
+            info!("off ===> {}", robot);
+            let left_wheel_counter = robot.get_left_wheel_counter();
+            let right_wheel_counter = robot.get_right_wheel_counter();
+            write!(
+                robot.set_lcd_cursor(0, 1),
+                "l: {} r: {}",
+                left_wheel_counter,
+                right_wheel_counter,
+            )
+            .ok();
+            loop_delay(&mut delay_shared, 1000, || {
+                robot.handle_loop();
+            });
 
+            robot.handle_loop();
+        }
+        if robot.button2_pressed() {
+            write!(robot.clear_lcd().set_lcd_cursor(0, 0), "button2 pressed",).ok();
+            write!(robot.set_lcd_cursor(0, 1), "millis: {}", millis()).ok();
+            delay_shared.borrow_mut().delay_ms(500);
+        }
         robot.handle_loop();
     }
 }
