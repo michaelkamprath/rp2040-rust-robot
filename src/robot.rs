@@ -1,9 +1,10 @@
 #![allow(non_camel_case_types, dead_code)]
 mod debouncer;
+mod motor_controller;
 
 use crate::{
-    l298n::motor_controller::MotorController, model::heading::HeadingCalculator,
-    robot::debouncer::DebouncedButton,
+    model::heading::HeadingCalculator, robot::debouncer::DebouncedButton,
+    robot::motor_controller::MotorController,
 };
 use adafruit_lcd_backpack::{LcdBackpack, LcdDisplayType};
 use alloc::rc::Rc;

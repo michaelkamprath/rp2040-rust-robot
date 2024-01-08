@@ -1,6 +1,7 @@
 use embedded_hal::digital::v2::OutputPin;
 use embedded_hal::PwmPin;
 
+/// A L298N motor controller that can control two motors.
 pub struct MotorController<INA1, INA2, INB1, INB2, ENA, ENB> {
     ina1: INA1,
     ina2: INA2,
