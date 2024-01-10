@@ -173,7 +173,7 @@ fn main() -> ! {
         }
         if robot.button2_pressed() {
             write!(robot.clear_lcd().set_lcd_cursor(0, 0), "button2 pressed",).ok();
-            write!(robot.set_lcd_cursor(0, 1), "millis: {}", millis()).ok();
+            write!(robot.set_lcd_cursor(0, 1), "ms: {}", millis()).ok();
             delay_shared.borrow_mut().delay_ms(500);
         }
         robot.handle_loop();

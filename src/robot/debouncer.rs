@@ -2,8 +2,8 @@ use crate::system::millis::millis;
 use defmt::trace;
 use embedded_hal::digital::v2::InputPin;
 
-/// A debounced button. The button is considered pressed when the pin is equal to `ACTIVE`.
-/// The button is considered released when the pin is not equal to `ACTIVE`. A debounce
+/// A debounced button. The button is considered pressed when the pin is equal to the level indicated by `ACTIVE`.
+/// `ACTIVE` being true indicates the button is active HIGH, and false indicates active LOW. A debounce
 /// period of `DEBOUNCE` milliseconds is used to prevent bouncing.
 pub struct DebouncedButton<PIN: InputPin, const ACTIVE: bool, const DEBOUNCE: u32> {
     pin: PIN,
