@@ -94,8 +94,5 @@ incremental = false
 lto = 'fat'
 opt-level = 3
 
-# [patch."https://github.com/michaelkamprath/mpu6050.git"]
-# mpu6050 = { path = "../mpu6050" }
-
-[patch."https://github.com/michaelkamprath/adafruit-lcd-backpack-rust.git"]
-adafruit-lcd-backpack = { path = "../adafruit-lcd-backpack-rust" }
+[patch."https://github.com/michaelkamprath/mpu6050.git"]
+mpu6050 = { path = "../mpu6050" }

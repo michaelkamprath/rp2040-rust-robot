@@ -4,17 +4,21 @@ mod motor_controller;
 
 use crate::{
     model::heading::HeadingCalculator, robot::debouncer::DebouncedButton,
-    robot::motor_controller::MotorController,
+    robot::motor_controller::MotorController, system::millis::millis,
 };
 use adafruit_lcd_backpack::{LcdBackpack, LcdDisplayType};
-use alloc::rc::Rc;
-use core::cell::{Cell, RefCell};
+use alloc::{rc::Rc, string::ToString};
+use core::{
+    self,
+    cell::{Cell, RefCell},
+    fmt::Write,
+};
 use cortex_m::interrupt::Mutex;
+use defmt::Format;
 use defmt::{error, info};
-use defmt::{write, Format};
 use embedded_hal::{
     blocking::delay::{DelayMs, DelayUs},
-    blocking::i2c::{Write, WriteRead},
+    blocking::i2c::{Write as I2cWrite, WriteRead},
     digital::v2::{InputPin, OutputPin},
     PwmPin,
 };
@@ -26,6 +30,21 @@ use rp_pico::hal::{
     },
     pac::{self, interrupt},
 };
+
+const UP_ARROW_CHARACTER_DEFINITION: [u8; 8] = [
+    0b00000, 0b00100, 0b01110, 0b10101, 0b00100, 0b00100, 0b00100, 0b00000,
+];
+const DOWN_ARROW_CHARACTER_DEFINITION: [u8; 8] = [
+    0b00000, 0b00100, 0b00100, 0b00100, 0b10101, 0b01110, 0b00100, 0b00000,
+];
+
+const UP_ARROW_CHARACTER: u8 = 1;
+const DOWN_ARROW_CHARACTER: u8 = 2;
+
+const UP_ARROW_STRING: &str = "\x01";
+const DOWN_ARROW_STRING: &str = "\x02";
+const LEFT_ARROW_STRING: &str = "\x7F";
+const RIGHT_ARROW_STRING: &str = "\x7E";
 
 //==============================================================================
 // Interrupt pins and counters for wheel encoders
@@ -88,7 +107,7 @@ impl<
         DELAY,
     > Robot<INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI, DELAY>
 where
-    TWI: Write<Error = TWI_ERR> + WriteRead<Error = TWI_ERR>,
+    TWI: I2cWrite<Error = TWI_ERR> + WriteRead<Error = TWI_ERR>,
     TWI_ERR: defmt::Format,
     DELAY: DelayMs<u16> + DelayUs<u16> + DelayMs<u8>,
 {
@@ -138,7 +157,21 @@ where
                 error!("Error initializing LCD: {}", e);
             }
         };
-        lcd.print("Hellorld!").ok();
+
+        if let Err(error) = lcd.create_char(UP_ARROW_CHARACTER, UP_ARROW_CHARACTER_DEFINITION) {
+            error!("Error creating up arrow character: {}", error);
+        };
+        if let Err(error) = lcd.create_char(DOWN_ARROW_CHARACTER, DOWN_ARROW_CHARACTER_DEFINITION) {
+            error!("Error creating down arrow character: {}", error);
+        };
+
+        if let Err(error) = lcd
+            .home()
+            .and_then(LcdBackpack::clear)
+            .and_then(|lcd| LcdBackpack::print(lcd, "Robot Started"))
+        {
+            error!("Error writing to LCD: {}", error);
+        }
 
         // return the robot
         info!("Robot initialized");
@@ -158,7 +191,7 @@ where
         self.button1.handle_loop();
         self.button2.handle_loop();
 
-        // self.heading_calculator.update();
+        self.heading_calculator.update();
     }
 
     pub fn display_text(&mut self, text: &str) {
@@ -222,6 +255,53 @@ where
 
     pub fn straight(&mut self, distance_mm: u32) -> &mut Self {
         info!("Robot move straight, distance = {}", distance_mm);
+        if let Err(error) = core::write!(
+            self.clear_lcd().set_lcd_cursor(0, 0),
+            "{} {} mm",
+            UP_ARROW_STRING,
+            distance_mm,
+        ) {
+            error!("Error writing to LCD: {}", error.to_string().as_str());
+        }
+
+        let expected_ticks = (distance_mm as f32 * WHEEL_TICKS_PER_MM) as u32;
+
+        self.reset_wheel_counters();
+        self.motors
+            .set_duty(self.noramlize_duty(1.0), self.noramlize_duty(1.0));
+        self.motors.forward();
+
+        let mut traveled_ticks: u32 = 0;
+        let mut last_update_millis = 0;
+
+        while traveled_ticks < expected_ticks {
+            cortex_m::interrupt::free(|cs| {
+                traveled_ticks = (LEFT_WHEEL_COUNTER.borrow(cs).get()
+                    + RIGHT_WHEEL_COUNTER.borrow(cs).get())
+                    / 2;
+            });
+            if millis() - last_update_millis > 250 {
+                last_update_millis = millis();
+                if let Err(error) = core::write!(
+                    self.set_lcd_cursor(0, 1),
+                    "{} / {}",
+                    traveled_ticks,
+                    expected_ticks,
+                ) {
+                    error!("Error writing to LCD: {}", error.to_string().as_str());
+                }
+            }
+            self.handle_loop();
+        }
+        if let Err(error) = core::write!(
+            self.set_lcd_cursor(0, 1),
+            "{} / {}",
+            traveled_ticks,
+            expected_ticks,
+        ) {
+            error!("Error writing to LCD: {}", error.to_string().as_str());
+        }
+        self.motors.stop();
 
         self
     }
@@ -262,12 +342,12 @@ impl<
         DELAY,
     > Format for Robot<INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI, DELAY>
 where
-    TWI: Write<Error = TWI_ERR> + WriteRead<Error = TWI_ERR>,
+    TWI: I2cWrite<Error = TWI_ERR> + WriteRead<Error = TWI_ERR>,
     TWI_ERR: defmt::Format,
     DELAY: DelayMs<u16> + DelayUs<u16> + DelayMs<u8>,
 {
     fn format(&self, f: defmt::Formatter) {
-        write!(
+        defmt::write!(
             f,
             "Robot< left = {}, right = {} >",
             self.get_left_wheel_counter(),
@@ -276,7 +356,7 @@ where
     }
 }
 
-/// Implement the `core::fmt::Write` trait for the robot, allowing us to use the `write!` macro
+/// Implement the `core::fmt::Write` trait for the robot, allowing us to use the `core::write!` macro
 impl<
         INA1: OutputPin,
         INA2: OutputPin,
@@ -291,11 +371,11 @@ impl<
         DELAY,
     > core::fmt::Write for Robot<INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI, DELAY>
 where
-    TWI: Write<Error = TWI_ERR> + WriteRead<Error = TWI_ERR>,
+    TWI: I2cWrite<Error = TWI_ERR> + WriteRead<Error = TWI_ERR>,
     TWI_ERR: defmt::Format,
     DELAY: DelayMs<u16> + DelayUs<u16> + DelayMs<u8>,
 {
-    fn write_str(&mut self, s: &str) -> Result<(), core::fmt::Error> {
+    fn write_str(&mut self, s: &str) -> core::fmt::Result {
         self.lcd.write_str(s)
     }
 }

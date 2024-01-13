@@ -1,5 +1,6 @@
 #![no_std]
 #![no_main]
+mod driver;
 mod model;
 mod robot;
 mod system;
@@ -9,10 +10,9 @@ use bsp::{
     entry,
     hal::{fugit::HertzU32, gpio},
 };
-use core::{cell::RefCell, fmt::Write};
+use core::cell::RefCell;
 use defmt::{info, panic};
 use defmt_rtt as _;
-use embedded_hal::digital::v2::OutputPin;
 use panic_probe as _;
 
 // Provide an alias for our BSP so we can switch targets quickly.
@@ -35,8 +35,9 @@ use bsp::hal::{
     watchdog::Watchdog,
 };
 
+use driver::Driver;
 use robot::Robot;
-use system::millis::{init_millis, millis};
+use system::millis::init_millis;
 
 #[entry]
 fn main() -> ! {
@@ -109,7 +110,7 @@ fn main() -> ! {
         clocks.system_clock.freq(),
     );
 
-    let mut robot = Robot::new(
+    let robot = Robot::new(
         pins.gpio10.into_push_pull_output(),
         pins.gpio11.into_push_pull_output(),
         pins.gpio13.into_push_pull_output(),
@@ -124,74 +125,15 @@ fn main() -> ! {
         &mut delay_shared,
     );
 
-    info!("robot controller created");
+    let mut driver = Driver::new(
+        robot,
+        delay_shared.clone(),
+        pins.led.into_push_pull_output(),
+    );
 
-    // This is the correct pin on the Raspberry Pico board. On other boards, even if they have an
-    // on-board LED, it might need to be changed.
-    // Notably, on the Pico W, the LED is not connected to any of the RP2040 GPIOs but to the cyw43 module instead. If you have
-    // a Pico W and want to toggle a LED with a simple GPIO output pin, you can connect an external
-    // LED to one of the GPIO pins, and reference that pin here.
-    let mut led_pin = pins.led.into_push_pull_output();
+    info!("robot controller and driver created");
 
     loop {
-        if robot.button1_pressed() {
-            info!("button1 pressed");
-            robot.reset_wheel_counters();
-            let heading = robot.heading_calculator.heading();
-            write!(
-                robot.clear_lcd().set_lcd_cursor(0, 0),
-                "heading: {}",
-                heading,
-            )
-            .ok();
-            robot.forward(1.0);
-            led_pin.set_high().unwrap();
-            loop_delay(&mut delay_shared, 2000, || {
-                robot.handle_loop();
-            });
-
-            robot.stop();
-            led_pin.set_low().unwrap();
-            loop_delay(&mut delay_shared, 500, || {
-                robot.handle_loop();
-            });
-            info!("off ===> {}", robot);
-            let left_wheel_counter = robot.get_left_wheel_counter();
-            let right_wheel_counter = robot.get_right_wheel_counter();
-            write!(
-                robot.set_lcd_cursor(0, 1),
-                "l: {} r: {}",
-                left_wheel_counter,
-                right_wheel_counter,
-            )
-            .ok();
-            loop_delay(&mut delay_shared, 1000, || {
-                robot.handle_loop();
-            });
-
-            robot.handle_loop();
-        }
-        if robot.button2_pressed() {
-            write!(robot.clear_lcd().set_lcd_cursor(0, 0), "button2 pressed",).ok();
-            write!(robot.set_lcd_cursor(0, 1), "ms: {}", millis()).ok();
-            delay_shared.borrow_mut().delay_ms(500);
-        }
-        robot.handle_loop();
-    }
-}
-
-fn loop_delay<F>(
-    delayer: &mut Rc<RefCell<impl embedded_hal::blocking::delay::DelayMs<u32>>>,
-    delay_ms: u32,
-    mut f: F,
-) where
-    F: FnMut(),
-{
-    // we want to call f() at least every 25 ms
-    let start_millis = millis();
-    while millis() - start_millis < delay_ms {
-        f();
-        let next_loop_delay = (delay_ms - (millis() - start_millis)).max(1).min(25);
-        delayer.borrow_mut().delay_ms(next_loop_delay);
+        driver.handle_loop();
     }
 }
