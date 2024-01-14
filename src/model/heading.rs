@@ -71,13 +71,6 @@ where
         if let Err(error) = gyro.set_gyro_offsets(98, 44, 16) {
             error!("Error setting gyro offsets: {}", error);
         }
-        // if the current offsets are non-zero, that means we are in a reboot scenario.
-        // in that case, we want to leave the current offsets as-is.
-        if cur_offsets.x != 0.0 || cur_offsets.y != 0.0 || cur_offsets.z != 0.0 {
-            info!("Gyro offsets already set, not changing them");
-        } else if let Err(error) = gyro.set_gyro_offsets(98, 44, 20) {
-            error!("Error setting gyro offsets: {}", error);
-        }
 
         Self {
             heading: 0.0,

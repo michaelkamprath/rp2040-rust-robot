@@ -1,10 +1,15 @@
 #![allow(non_camel_case_types, dead_code)]
 mod debouncer;
 mod motor_controller;
+mod telemetry;
 
 use crate::{
-    model::heading::HeadingCalculator, robot::debouncer::DebouncedButton,
-    robot::motor_controller::MotorController, system::millis::millis,
+    model::{heading::HeadingCalculator, pid_controller::PIDController},
+    robot::{
+        debouncer::DebouncedButton, motor_controller::MotorController,
+        telemetry::straight_movement::StraightTelemetryRow,
+    },
+    system::{data::DataTable, millis::millis},
 };
 use adafruit_lcd_backpack::{LcdBackpack, LcdDisplayType};
 use alloc::{rc::Rc, string::ToString};
@@ -14,8 +19,7 @@ use core::{
     fmt::Write,
 };
 use cortex_m::interrupt::Mutex;
-use defmt::Format;
-use defmt::{error, info};
+use defmt::{debug, error, info, Format};
 use embedded_hal::{
     blocking::delay::{DelayMs, DelayUs},
     blocking::i2c::{Write as I2cWrite, WriteRead},
@@ -38,13 +42,12 @@ const DOWN_ARROW_CHARACTER_DEFINITION: [u8; 8] = [
     0b00000, 0b00100, 0b00100, 0b00100, 0b10101, 0b01110, 0b00100, 0b00000,
 ];
 
-const UP_ARROW_CHARACTER: u8 = 1;
-const DOWN_ARROW_CHARACTER: u8 = 2;
-
 const UP_ARROW_STRING: &str = "\x01";
 const DOWN_ARROW_STRING: &str = "\x02";
 const LEFT_ARROW_STRING: &str = "\x7F";
 const RIGHT_ARROW_STRING: &str = "\x7E";
+
+const DISPLAY_RESET_DELAY_MS: u32 = 5000;
 
 //==============================================================================
 // Interrupt pins and counters for wheel encoders
@@ -64,14 +67,17 @@ static RIGHT_WHEEL_COUNTER: Mutex<Cell<u32>> = Mutex::new(Cell::new(0));
 //==============================================================================
 // Constants for the robot
 //
-const WHEEL_DIAMETER: f32 = 65.0; // mm
+const WHEEL_DIAMETER: f32 = 67.0; // mm
 const WHEEL_CIRCUMFERENCE: f32 = WHEEL_DIAMETER * core::f32::consts::PI;
-const MOTOR_REDUCTION_RATIO: f32 = 46.8;
-const ENCODER_TICKS_PER_REVOLUTION: f32 = 11.0;
+const MOTOR_REDUCTION_RATIO: f32 = 78.0;
+const ENCODER_TICKS_PER_REVOLUTION: f32 = 12.0;
 const WHEEL_TICKS_PER_REVOLUTION: f32 = ENCODER_TICKS_PER_REVOLUTION * MOTOR_REDUCTION_RATIO;
 const WHEEL_TICKS_PER_MM: f32 = WHEEL_TICKS_PER_REVOLUTION / WHEEL_CIRCUMFERENCE;
+const MM_PER_WHEEL_TICK: f32 = WHEEL_CIRCUMFERENCE / WHEEL_TICKS_PER_REVOLUTION;
 
 const BUTTON_DEBOUNCE_TIME_MS: u32 = 10;
+const CONTROLLER_SAMPLE_PERIOD_MS: u32 = 50;
+
 pub struct Robot<
     INA1: OutputPin,
     INA2: OutputPin,
@@ -90,6 +96,7 @@ pub struct Robot<
     _i2c: Rc<RefCell<TWI>>,
     pub heading_calculator: HeadingCalculator<TWI, DELAY>,
     lcd: LcdBackpack<TWI, DELAY>,
+    reset_display_start_millis: u32,
 }
 
 #[allow(dead_code, non_camel_case_types)]
@@ -158,10 +165,15 @@ where
             }
         };
 
-        if let Err(error) = lcd.create_char(UP_ARROW_CHARACTER, UP_ARROW_CHARACTER_DEFINITION) {
+        if let Err(error) =
+            lcd.create_char(UP_ARROW_STRING.as_bytes()[0], UP_ARROW_CHARACTER_DEFINITION)
+        {
             error!("Error creating up arrow character: {}", error);
         };
-        if let Err(error) = lcd.create_char(DOWN_ARROW_CHARACTER, DOWN_ARROW_CHARACTER_DEFINITION) {
+        if let Err(error) = lcd.create_char(
+            DOWN_ARROW_STRING.as_bytes()[0],
+            DOWN_ARROW_CHARACTER_DEFINITION,
+        ) {
             error!("Error creating down arrow character: {}", error);
         };
 
@@ -182,11 +194,20 @@ where
             _i2c: i2c_shared,
             heading_calculator,
             lcd,
+            reset_display_start_millis: millis(), // start the display reset timer to clear the "started" message
         }
     }
 
     /// This function is called in the main loop to allow the robot to handle state updates
     pub fn handle_loop(&mut self) {
+        if self.reset_display_start_millis != 0
+            && millis() - self.reset_display_start_millis > DISPLAY_RESET_DELAY_MS
+        {
+            if let Err(error) = core::write!(self.clear_lcd().set_lcd_cursor(0, 0), "Robot Idle") {
+                error!("Error writing to LCD: {}", error.to_string().as_str());
+            }
+            self.reset_display_start_millis = 0;
+        }
         // unset button press if button is not pressed
         self.button1.handle_loop();
         self.button2.handle_loop();
@@ -246,6 +267,15 @@ where
         self.button2.is_newly_pressed()
     }
 
+    /// Starts the robot display reset timer
+    pub fn start_display_reset_timer(&mut self) {
+        self.reset_display_start_millis = millis();
+    }
+
+    //--------------------------------------------------------------------------
+    // Robot movement functions
+    //--------------------------------------------------------------------------
+
     pub fn forward(&mut self, duty: f32) -> &mut Self {
         let normalized_duty = self.noramlize_duty(duty);
         self.motors.set_duty(normalized_duty, normalized_duty);
@@ -254,10 +284,9 @@ where
     }
 
     pub fn straight(&mut self, distance_mm: u32) -> &mut Self {
-        info!("Robot move straight, distance = {}", distance_mm);
         if let Err(error) = core::write!(
             self.clear_lcd().set_lcd_cursor(0, 0),
-            "{} {} mm",
+            "{} 0 / {} mm",
             UP_ARROW_STRING,
             distance_mm,
         ) {
@@ -265,28 +294,90 @@ where
         }
 
         let expected_ticks = (distance_mm as f32 * WHEEL_TICKS_PER_MM) as u32;
-
+        info!(
+            "Robot move straight, distance = {}, target ticks = {}",
+            distance_mm, expected_ticks
+        );
         self.reset_wheel_counters();
-        self.motors
-            .set_duty(self.noramlize_duty(1.0), self.noramlize_duty(1.0));
-        self.motors.forward();
+
+        let mut data_table =
+            DataTable::<StraightTelemetryRow, 5>::new(*StraightTelemetryRow::header());
 
         let mut traveled_ticks: u32 = 0;
         let mut last_update_millis = 0;
+        let mut left_wheel_ticks = 0;
+        let mut right_wheel_ticks = 0;
+
+        let mut controller = PIDController::new(0.1, 0., 0.);
+        // we want to go straight, so the setpoint is 0
+        controller.set_setpoint(0.);
+        self.heading_calculator.reset();
+
+        self.motors
+            .set_duty(self.noramlize_duty(1.), self.noramlize_duty(1.));
+        data_table.append(StraightTelemetryRow::new(
+            millis(),
+            0,
+            0,
+            self.heading_calculator.heading(),
+            0.,
+        ));
+        let mut update_count: u32 = 0;
+        self.motors.forward();
 
         while traveled_ticks < expected_ticks {
             cortex_m::interrupt::free(|cs| {
-                traveled_ticks = (LEFT_WHEEL_COUNTER.borrow(cs).get()
-                    + RIGHT_WHEEL_COUNTER.borrow(cs).get())
-                    / 2;
+                left_wheel_ticks = LEFT_WHEEL_COUNTER.borrow(cs).get();
+                right_wheel_ticks = RIGHT_WHEEL_COUNTER.borrow(cs).get();
             });
-            if millis() - last_update_millis > 250 {
+            traveled_ticks = (left_wheel_ticks + right_wheel_ticks) / 2;
+            if millis() - last_update_millis > CONTROLLER_SAMPLE_PERIOD_MS {
                 last_update_millis = millis();
+                update_count += 1;
+
+                let heading = self.heading_calculator.heading();
+                let control_signal = controller.update(heading, last_update_millis);
+
+                let mut cs_indicator: &str = UP_ARROW_STRING;
+                // positive control signal means turn left, a negative control signal means turn right
+                if control_signal > 0. {
+                    self.motors.set_duty(
+                        self.noramlize_duty(1. - control_signal),
+                        self.noramlize_duty(1.),
+                    );
+                    cs_indicator = LEFT_ARROW_STRING;
+                } else if control_signal < 0. {
+                    self.motors.set_duty(
+                        self.noramlize_duty(1.),
+                        self.noramlize_duty(1. + control_signal),
+                    );
+                    cs_indicator = RIGHT_ARROW_STRING;
+                }
+
+                if update_count % 5 == 0 {
+                    let _ = data_table.append(StraightTelemetryRow::new(
+                        last_update_millis,
+                        left_wheel_ticks,
+                        right_wheel_ticks,
+                        heading,
+                        control_signal,
+                    ));
+                }
+
+                if let Err(error) = core::write!(
+                    self.set_lcd_cursor(0, 0),
+                    "{} {} / {} mm",
+                    UP_ARROW_STRING,
+                    (traveled_ticks as f32 * MM_PER_WHEEL_TICK) as i32,
+                    distance_mm,
+                ) {
+                    error!("Error writing to LCD: {}", error.to_string().as_str());
+                }
                 if let Err(error) = core::write!(
                     self.set_lcd_cursor(0, 1),
-                    "{} / {}",
-                    traveled_ticks,
-                    expected_ticks,
+                    "{} : cs={:.3}",
+                    cs_indicator,
+                    control_signal,
                 ) {
                     error!("Error writing to LCD: {}", error.to_string().as_str());
                 }
@@ -295,13 +386,27 @@ where
         }
         if let Err(error) = core::write!(
             self.set_lcd_cursor(0, 1),
-            "{} / {}",
-            traveled_ticks,
+            "{} {}{} {}/ {}",
+            left_wheel_ticks,
+            LEFT_ARROW_STRING,
+            RIGHT_ARROW_STRING,
+            right_wheel_ticks,
             expected_ticks,
         ) {
             error!("Error writing to LCD: {}", error.to_string().as_str());
         }
         self.motors.stop();
+        info!("Done with straight movement");
+        data_table.append(StraightTelemetryRow::new(
+            millis(),
+            left_wheel_ticks,
+            right_wheel_ticks,
+            self.heading_calculator.heading(),
+            0.,
+        ));
+        debug!("Completed data table");
+        info!("Movement data = {}", data_table);
+        self.start_display_reset_timer();
 
         self
     }
@@ -313,6 +418,7 @@ where
 
     //--------------------------------------------------------------------------
     // LCD functions
+    //--------------------------------------------------------------------------
 
     /// clears the robot's LCD Screen
     pub fn clear_lcd(&mut self) -> &mut Self {

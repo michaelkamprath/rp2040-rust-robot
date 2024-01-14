@@ -73,11 +73,8 @@ where
     pub fn handle_loop(&mut self) {
         if self.robot.button1_pressed() {
             self.led1.set_high().ok();
-            self.robot.straight(1000);
-            self.delay(1000);
-            self.robot.stop();
+            self.robot.straight(2000);
             self.led1.set_low().ok();
-            write!(self.robot.clear_lcd().set_lcd_cursor(0, 0), "done",).ok();
         }
         if self.robot.button2_pressed() {
             write!(
@@ -86,6 +83,7 @@ where
             )
             .ok();
             write!(self.robot.set_lcd_cursor(0, 1), "ms: {}", millis()).ok();
+            self.robot.start_display_reset_timer();
         }
         self.robot.handle_loop();
     }
