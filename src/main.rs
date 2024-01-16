@@ -120,7 +120,7 @@ fn main() -> ! {
         pins.gpio18.into_pull_up_input(),
         pins.gpio19.into_pull_up_input(),
         i2c,
-        pins.gpio16.into_pull_up_input(),
+        pins.gpio21.into_pull_up_input(),
         pins.gpio22.into_pull_up_input(),
         &mut delay_shared,
     );

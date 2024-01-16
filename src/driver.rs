@@ -1,9 +1,9 @@
 #![allow(non_camel_case_types, dead_code)]
-
 use core::{cell::RefCell, fmt::Write};
 
-use crate::{robot::Robot, system::millis::millis};
+use crate::{model::point::Point, robot::Robot, system::millis::millis};
 use alloc::rc::Rc;
+use defmt::debug;
 use embedded_hal::{
     blocking::delay::{DelayMs, DelayUs},
     blocking::i2c::{Write as I2cWrite, WriteRead},
@@ -86,5 +86,31 @@ where
             self.robot.start_display_reset_timer();
         }
         self.robot.handle_loop();
+    }
+
+    pub fn trace_path(&mut self, point_sequence: &[Point]) {
+        let mut cur_point = point_sequence[0];
+        let mut cur_bearing: f32 = 0.0;
+
+        for next_point in point_sequence[1..].iter() {
+            let distance = cur_point.distance_to(next_point);
+            let bearing = cur_point.absolute_bearing(next_point);
+            let bearing_diff = bearing - cur_bearing;
+
+            debug!(
+                "cur_point: {:?}, next_point: {:?}, distance: {}, bearing: {}, bearing_diff: {}",
+                cur_point, next_point, distance, bearing, bearing_diff
+            );
+
+            // turn to the correct bearing
+            self.robot.turn(bearing_diff as i32);
+
+            // drive the distance
+            self.robot.straight(distance as u32);
+
+            // update the current point and bearing
+            cur_point = *next_point;
+            cur_bearing = bearing;
+        }
     }
 }

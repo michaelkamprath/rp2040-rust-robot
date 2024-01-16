@@ -29,7 +29,7 @@ use embedded_hal::{
 use rp_pico::hal::gpio;
 use rp_pico::hal::{
     gpio::{
-        bank0::{Gpio16, Gpio22},
+        bank0::{Gpio21, Gpio22},
         FunctionSio, Interrupt, SioInput,
     },
     pac::{self, interrupt},
@@ -52,7 +52,7 @@ const DISPLAY_RESET_DELAY_MS: u32 = 5000;
 //==============================================================================
 // Interrupt pins and counters for wheel encoders
 //
-type LeftWheelCounterPin = gpio::Pin<Gpio16, FunctionSio<SioInput>, gpio::PullUp>;
+type LeftWheelCounterPin = gpio::Pin<Gpio21, FunctionSio<SioInput>, gpio::PullUp>;
 type RightWheelCounterPin = gpio::Pin<Gpio22, FunctionSio<SioInput>, gpio::PullUp>;
 
 static LEFT_WHEEL_COUNTER_PIN: Mutex<RefCell<Option<LeftWheelCounterPin>>> =
@@ -69,7 +69,7 @@ static RIGHT_WHEEL_COUNTER: Mutex<Cell<u32>> = Mutex::new(Cell::new(0));
 //
 const WHEEL_DIAMETER: f32 = 67.0; // mm
 const WHEEL_CIRCUMFERENCE: f32 = WHEEL_DIAMETER * core::f32::consts::PI;
-const MOTOR_REDUCTION_RATIO: f32 = 78.0;
+const MOTOR_REDUCTION_RATIO: f32 = 46.8;
 const ENCODER_TICKS_PER_REVOLUTION: f32 = 12.0;
 const WHEEL_TICKS_PER_REVOLUTION: f32 = ENCODER_TICKS_PER_REVOLUTION * MOTOR_REDUCTION_RATIO;
 const WHEEL_TICKS_PER_MM: f32 = WHEEL_TICKS_PER_REVOLUTION / WHEEL_CIRCUMFERENCE;
@@ -300,15 +300,17 @@ where
         );
         self.reset_wheel_counters();
 
-        let mut data_table =
-            DataTable::<StraightTelemetryRow, 5>::new(*StraightTelemetryRow::header());
+        let mut data_table = DataTable::<
+            StraightTelemetryRow,
+            { StraightTelemetryRow::DATA_COLUMNS },
+        >::new(*StraightTelemetryRow::header());
 
         let mut traveled_ticks: u32 = 0;
         let mut last_update_millis = 0;
         let mut left_wheel_ticks = 0;
         let mut right_wheel_ticks = 0;
 
-        let mut controller = PIDController::new(0.1, 0., 0.);
+        let mut controller = PIDController::new(0.5, 0., 0.);
         // we want to go straight, so the setpoint is 0
         controller.set_setpoint(0.);
         self.heading_calculator.reset();
@@ -319,6 +321,8 @@ where
             millis(),
             0,
             0,
+            1.0,
+            1.0,
             self.heading_calculator.heading(),
             0.,
         ));
@@ -340,25 +344,28 @@ where
 
                 let mut cs_indicator: &str = UP_ARROW_STRING;
                 // positive control signal means turn left, a negative control signal means turn right
+                let mut left_power: f32 = 1.;
+                let mut right_power: f32 = 1.;
                 if control_signal > 0. {
-                    self.motors.set_duty(
-                        self.noramlize_duty(1. - control_signal),
-                        self.noramlize_duty(1.),
-                    );
+                    left_power = 1. - control_signal;
+                    right_power = 1.0;
                     cs_indicator = LEFT_ARROW_STRING;
                 } else if control_signal < 0. {
-                    self.motors.set_duty(
-                        self.noramlize_duty(1.),
-                        self.noramlize_duty(1. + control_signal),
-                    );
+                    left_power = 1.0;
+                    right_power = 1. + control_signal;
                     cs_indicator = RIGHT_ARROW_STRING;
                 }
-
+                self.motors.set_duty(
+                    self.noramlize_duty(left_power),
+                    self.noramlize_duty(right_power),
+                );
                 if update_count % 5 == 0 {
                     let _ = data_table.append(StraightTelemetryRow::new(
                         last_update_millis,
                         left_wheel_ticks,
                         right_wheel_ticks,
+                        left_power,
+                        right_power,
                         heading,
                         control_signal,
                     ));
@@ -401,12 +408,21 @@ where
             millis(),
             left_wheel_ticks,
             right_wheel_ticks,
+            0.,
+            0.,
             self.heading_calculator.heading(),
             0.,
         ));
         debug!("Completed data table");
         info!("Movement data = {}", data_table);
         self.start_display_reset_timer();
+
+        self
+    }
+
+    pub fn turn(&mut self, angle_degrees: i32) -> &mut Self {
+        info!("Robot turn, angle = {}", angle_degrees);
+        self.reset_wheel_counters();
 
         self
     }
@@ -498,6 +514,8 @@ fn IO_IRQ_BANK0() {
                 pin.clear_interrupt(Interrupt::EdgeLow);
             }
         }
+    });
+    cortex_m::interrupt::free(|cs| {
         if let Some(pin) = RIGHT_WHEEL_COUNTER_PIN.borrow(cs).borrow_mut().as_mut() {
             if pin.interrupt_status(Interrupt::EdgeLow) {
                 RIGHT_WHEEL_COUNTER
