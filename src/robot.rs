@@ -29,7 +29,7 @@ use embedded_hal::{
 use rp_pico::hal::gpio;
 use rp_pico::hal::{
     gpio::{
-        bank0::{Gpio21, Gpio22},
+        bank0::{Gpio20, Gpio21},
         FunctionSio, Interrupt, SioInput,
     },
     pac::{self, interrupt},
@@ -53,7 +53,7 @@ const DISPLAY_RESET_DELAY_MS: u32 = 5000;
 // Interrupt pins and counters for wheel encoders
 //
 type LeftWheelCounterPin = gpio::Pin<Gpio21, FunctionSio<SioInput>, gpio::PullUp>;
-type RightWheelCounterPin = gpio::Pin<Gpio22, FunctionSio<SioInput>, gpio::PullUp>;
+type RightWheelCounterPin = gpio::Pin<Gpio20, FunctionSio<SioInput>, gpio::PullUp>;
 
 static LEFT_WHEEL_COUNTER_PIN: Mutex<RefCell<Option<LeftWheelCounterPin>>> =
     Mutex::new(RefCell::new(None));
@@ -203,6 +203,7 @@ where
         if self.reset_display_start_millis != 0
             && millis() - self.reset_display_start_millis > DISPLAY_RESET_DELAY_MS
         {
+            debug!("Resetting LCD to idle message");
             if let Err(error) = core::write!(self.clear_lcd().set_lcd_cursor(0, 0), "Robot Idle") {
                 error!("Error writing to LCD: {}", error.to_string().as_str());
             }

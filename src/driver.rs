@@ -77,6 +77,7 @@ where
             self.led1.set_low().ok();
         }
         if self.robot.button2_pressed() {
+            debug!("button2 pressed");
             write!(
                 self.robot.clear_lcd().set_lcd_cursor(0, 0),
                 "button2 pressed",
