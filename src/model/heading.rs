@@ -18,7 +18,7 @@ use mpu6050::Mpu6050;
 //      [-2241,-2240] --> [-1,15]	    [1803,1804] --> [-10,6]	    [1573,1574] --> [16371,16394]	[98,99] --> [-2,1]	    [44,45] --> [0,5]	    [19,20] --> [0,4]
 //      [-2239,-2238] --> [-3,16]	    [1804,1804] --> [0,5]	    [1575,1576] --> [16378,16395]	[98,99] --> [-1,2]	    [43,44] --> [-2,1]	    [19,20] --> [-1,2]
 
-const HEADING_UPDATE_INTERVAL_MS: u32 = 2;
+const HEADING_UPDATE_INTERVAL_MS: u32 = 1;
 
 pub struct HeadingCalculator<TWI, DELAY> {
     heading: f32,
@@ -104,10 +104,6 @@ where
                     } else if self.heading < -180.0 {
                         self.heading += 360.0;
                     }
-                    // debug!(
-                    //     "{}: delta_rads: {}, heading: {}",
-                    //     self.gyro, delta_rads, self.heading
-                    // );
                 }
                 Err(error) => {
                     error!("Error reading gyro: {}", error);

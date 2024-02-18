@@ -6,11 +6,16 @@ use micromath::F32Ext;
 pub struct Point {
     x: i32,
     y: i32,
+    forward: bool,
 }
 
 impl Point {
     pub fn new(x: i32, y: i32) -> Self {
-        Self { x, y }
+        Point::new_with_forward(x, y, true)
+    }
+
+    pub fn new_with_forward(x: i32, y: i32, forward: bool) -> Self {
+        Self { x, y, forward }
     }
 
     pub fn x(&self) -> i32 {
@@ -19,6 +24,10 @@ impl Point {
 
     pub fn y(&self) -> i32 {
         self.y
+    }
+
+    pub fn forward(&self) -> bool {
+        self.forward
     }
 
     /// The distance from this point to the other point
@@ -30,11 +39,24 @@ impl Point {
 
     /// The absolute bearing from this point to the other point, in degrees. 0 degrees pointing postively in the y axis, and
     /// the right hand rule is used to determine the angle. 90 degrees is pointing negatively in the x axis, 180 degrees
-    /// radians is pointing negatively in the y axis, and -90 degrees is pointing positively in the x axis
+    /// radians is pointing negatively in the y axis, and -90 degrees is pointing positively in the x axis.
+    /// Takes into account the forward direction of the robot.
     pub fn absolute_bearing(&self, other: &Point) -> f32 {
         let x_diff = -(other.x - self.x);
         let y_diff = other.y - self.y;
-        (x_diff as f32).atan2(y_diff as f32).to_degrees()
+        let bearing = (x_diff as f32).atan2(y_diff as f32).to_degrees();
+        if other.forward {
+            bearing
+        } else {
+            let reverse = bearing + 180.0;
+            if reverse > 180.0 {
+                reverse - 360.0
+            } else if reverse < -180.0 {
+                reverse + 360.0
+            } else {
+                reverse
+            }
+        }
     }
 }
 

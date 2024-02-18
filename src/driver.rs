@@ -76,10 +76,8 @@ where
             self.led1.set_high().ok();
             self.trace_path(&[
                 Point::new(0, 0),
-                Point::new(500, 0),
-                Point::new(500, 500),
                 Point::new(0, 500),
-                Point::new(0, 0),
+                Point::new_with_forward(0, 0, false),
             ]);
             self.led1.set_low().ok();
         }
@@ -109,11 +107,7 @@ where
             let distance = cur_point.distance_to(next_point);
             let bearing = cur_point.absolute_bearing(next_point);
             let bearing_diff = bearing - cur_bearing;
-
-            debug!(
-                "cur_point: {:?}, next_point: {:?}, distance: {}, bearing: {}, bearing_diff: {}",
-                cur_point, next_point, distance, bearing, bearing_diff
-            );
+            debug!("driving to next way point\n  cur_point: {:?}, next_point: {:?}\n  distance: {}, bearing {}, forward: {}", cur_point, next_point, distance, bearing, next_point.forward());
 
             // turn to the correct bearing
             if bearing_diff.abs() > self.robot.min_turn_angle() {
@@ -121,7 +115,7 @@ where
             }
 
             // drive the distance
-            self.robot.straight(distance as u32);
+            self.robot.straight(distance as u32, next_point.forward());
 
             // update the current point and bearing
             cur_point = *next_point;

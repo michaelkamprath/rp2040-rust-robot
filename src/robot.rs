@@ -294,11 +294,17 @@ where
         self
     }
 
-    pub fn straight(&mut self, distance_mm: u32) -> &mut Self {
+    pub fn straight(&mut self, distance_mm: u32, forward: bool) -> &mut Self {
+        let direction_arrow = if forward {
+            UP_ARROW_STRING
+        } else {
+            DOWN_ARROW_STRING
+        };
+
         if let Err(error) = core::write!(
             self.clear_lcd().set_lcd_cursor(0, 0),
             "{} 0 / {} mm",
-            UP_ARROW_STRING,
+            direction_arrow,
             distance_mm,
         ) {
             error!("Error writing to LCD: {}", error.to_string().as_str());
@@ -338,7 +344,11 @@ where
             0.,
         ));
         let mut update_count: u32 = 0;
-        self.motors.forward();
+        if forward {
+            self.motors.forward();
+        } else {
+            self.motors.reverse();
+        }
 
         while traveled_ticks < expected_ticks {
             cortex_m::interrupt::free(|cs| {
@@ -353,15 +363,15 @@ where
                 let heading = self.heading_calculator.heading();
                 let control_signal = controller.update(heading, last_update_millis);
 
-                let mut cs_indicator: &str = UP_ARROW_STRING;
+                let mut cs_indicator: &str = direction_arrow;
                 // positive control signal means turn left, a negative control signal means turn right
                 let mut left_power: f32 = 1.;
                 let mut right_power: f32 = 1.;
-                if control_signal > 0. {
+                if (forward && control_signal > 0.) || (!forward && control_signal < 0.) {
                     left_power = 1. - control_signal;
                     right_power = 1.0;
                     cs_indicator = LEFT_ARROW_STRING;
-                } else if control_signal < 0. {
+                } else if (forward && control_signal < 0.) || (!forward && control_signal > 0.) {
                     left_power = 1.0;
                     right_power = 1. + control_signal;
                     cs_indicator = RIGHT_ARROW_STRING;
@@ -385,7 +395,7 @@ where
                 if let Err(error) = core::write!(
                     self.set_lcd_cursor(0, 0),
                     "{} {} / {} mm",
-                    UP_ARROW_STRING,
+                    direction_arrow,
                     (traveled_ticks as f32 * MM_PER_WHEEL_TICK) as i32,
                     distance_mm,
                 ) {
