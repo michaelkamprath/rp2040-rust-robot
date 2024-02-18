@@ -3,13 +3,14 @@ use core::{cell::RefCell, fmt::Write};
 
 use crate::{model::point::Point, robot::Robot, system::millis::millis};
 use alloc::rc::Rc;
-use defmt::debug;
+use defmt::{debug, warn};
 use embedded_hal::{
     blocking::delay::{DelayMs, DelayUs},
     blocking::i2c::{Write as I2cWrite, WriteRead},
     digital::v2::{InputPin, OutputPin},
     PwmPin,
 };
+use micromath::F32Ext;
 
 pub struct Driver<
     INA1: OutputPin,
@@ -73,7 +74,13 @@ where
     pub fn handle_loop(&mut self) {
         if self.robot.button1_pressed() {
             self.led1.set_high().ok();
-            self.robot.straight(2000);
+            self.trace_path(&[
+                Point::new(0, 0),
+                Point::new(500, 0),
+                Point::new(500, 500),
+                Point::new(0, 500),
+                Point::new(0, 0),
+            ]);
             self.led1.set_low().ok();
         }
         if self.robot.button2_pressed() {
@@ -90,8 +97,13 @@ where
     }
 
     pub fn trace_path(&mut self, point_sequence: &[Point]) {
+        if point_sequence.len() < 2 {
+            warn!("trace_path: point_sequence too short");
+            return;
+        }
         let mut cur_point = point_sequence[0];
-        let mut cur_bearing: f32 = 0.0;
+        // start with the bearing from the first point to the second point
+        let mut cur_bearing: f32 = point_sequence[0].absolute_bearing(&point_sequence[1]);
 
         for next_point in point_sequence[1..].iter() {
             let distance = cur_point.distance_to(next_point);
@@ -104,7 +116,9 @@ where
             );
 
             // turn to the correct bearing
-            self.robot.turn(bearing_diff as i32);
+            if bearing_diff.abs() > self.robot.min_turn_angle() {
+                self.robot.turn(bearing_diff as i32);
+            }
 
             // drive the distance
             self.robot.straight(distance as u32);

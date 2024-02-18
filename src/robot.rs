@@ -26,6 +26,7 @@ use embedded_hal::{
     digital::v2::{InputPin, OutputPin},
     PwmPin,
 };
+use micromath::F32Ext;
 use rp_pico::hal::gpio;
 use rp_pico::hal::{
     gpio::{
@@ -41,11 +42,15 @@ const UP_ARROW_CHARACTER_DEFINITION: [u8; 8] = [
 const DOWN_ARROW_CHARACTER_DEFINITION: [u8; 8] = [
     0b00000, 0b00100, 0b00100, 0b00100, 0b10101, 0b01110, 0b00100, 0b00000,
 ];
+const DEGREES_CHARACTER_DEFINITION: [u8; 8] = [
+    0b00110, 0b01001, 0b01001, 0b00110, 0b00000, 0b00000, 0b00000, 0b00000,
+];
 
 const UP_ARROW_STRING: &str = "\x01";
 const DOWN_ARROW_STRING: &str = "\x02";
 const LEFT_ARROW_STRING: &str = "\x7F";
 const RIGHT_ARROW_STRING: &str = "\x7E";
+const DEGREES_STRING: &str = "\x03";
 
 const DISPLAY_RESET_DELAY_MS: u32 = 5000;
 
@@ -175,6 +180,11 @@ where
             DOWN_ARROW_CHARACTER_DEFINITION,
         ) {
             error!("Error creating down arrow character: {}", error);
+        };
+        if let Err(error) =
+            lcd.create_char(DEGREES_STRING.as_bytes()[0], DEGREES_CHARACTER_DEFINITION)
+        {
+            error!("Error creating degrees character: {}", error);
         };
 
         if let Err(error) = lcd
@@ -421,10 +431,103 @@ where
         self
     }
 
+    pub fn min_turn_angle(&self) -> f32 {
+        1.0
+    }
+
     pub fn turn(&mut self, angle_degrees: i32) -> &mut Self {
+        const TURN_MIN_POWER: f32 = 0.35;
+        if angle_degrees.abs() < self.min_turn_angle() as i32 {
+            debug!("Turn angle {} too small, not turning", angle_degrees);
+            return self;
+        }
+
         info!("Robot turn, angle = {}", angle_degrees);
         self.reset_wheel_counters();
+        let direction_str = if angle_degrees > 0 {
+            LEFT_ARROW_STRING
+        } else {
+            RIGHT_ARROW_STRING
+        };
+        if let Err(error) = core::write!(
+            self.clear_lcd().set_lcd_cursor(0, 0),
+            "{} 0 / {}\x03",
+            direction_str,
+            angle_degrees,
+        ) {
+            error!("Error writing to LCD: {}", error.to_string().as_str());
+        }
+        self.heading_calculator.reset();
+        let mut current_angle = self.heading_calculator.heading();
+        let mut last_adjust_angle = current_angle;
 
+        // start the motors per right hand rule (postive angle = left turn, negative angle = right turn)
+        // motor A is the left motor, motor B is the right motor
+        self.motors
+            .set_duty(self.noramlize_duty(1.), self.noramlize_duty(1.));
+        if angle_degrees > 0 {
+            self.motors.reverse_a();
+            self.motors.forward_b();
+        } else {
+            self.motors.forward_a();
+            self.motors.reverse_b();
+        }
+
+        while current_angle.abs() < (angle_degrees.abs() - 12) as f32 {
+            current_angle = self.heading_calculator.heading();
+
+            if (current_angle - last_adjust_angle).abs() > 5.0 {
+                last_adjust_angle = current_angle;
+                let abs_angle = angle_degrees.abs() as f32;
+                let motor_power = TURN_MIN_POWER
+                    + (1.0 - TURN_MIN_POWER) * ((abs_angle - current_angle.abs()) / abs_angle);
+                self.motors.set_duty(
+                    self.noramlize_duty(motor_power),
+                    self.noramlize_duty(motor_power),
+                );
+            }
+            if let Err(error) = core::write!(
+                self.clear_lcd().set_lcd_cursor(0, 0),
+                "{} {} / {}\x03",
+                direction_str,
+                current_angle as i32,
+                angle_degrees,
+            ) {
+                error!("Error writing to LCD: {}", error.to_string().as_str());
+            }
+            self.handle_loop();
+        }
+        self.motors.stop();
+        let start_millis = millis();
+        let mut update_millis = start_millis;
+        while millis() - start_millis < 1000 {
+            self.handle_loop();
+            if millis() - update_millis > 400 {
+                update_millis = millis();
+                current_angle = self.heading_calculator.heading();
+                if let Err(error) = core::write!(
+                    self.clear_lcd().set_lcd_cursor(0, 0),
+                    "{} {} / {}\x03",
+                    direction_str,
+                    current_angle as i32,
+                    angle_degrees,
+                ) {
+                    error!("Error writing to LCD: {}", error.to_string().as_str());
+                }
+            }
+        }
+        current_angle = self.heading_calculator.heading();
+        if let Err(error) = core::write!(
+            self.clear_lcd().set_lcd_cursor(0, 0),
+            "{} {} / {}\x03",
+            direction_str,
+            current_angle as i32,
+            angle_degrees,
+        ) {
+            error!("Error writing to LCD: {}", error.to_string().as_str());
+        }
+        info!("Done with turn movement");
+        self.start_display_reset_timer();
         self
     }
 
