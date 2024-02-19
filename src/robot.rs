@@ -1,5 +1,6 @@
 #![allow(non_camel_case_types, dead_code)]
 mod debouncer;
+pub mod file_storage;
 mod motor_controller;
 mod telemetry;
 

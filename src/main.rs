@@ -14,6 +14,13 @@ use core::cell::RefCell;
 use defmt::{info, panic};
 use defmt_rtt as _;
 use panic_probe as _;
+use rp2040_hal::{
+    gpio::{
+        bank0::{Gpio0, Gpio2, Gpio3},
+        FunctionSpi, PullDown,
+    },
+    pac::SPI0,
+};
 
 // Provide an alias for our BSP so we can switch targets quickly.
 // Uncomment the BSP you included in Cargo.toml, the rest of the code does not need to change.
@@ -110,6 +117,38 @@ fn main() -> ! {
         clocks.system_clock.freq(),
     );
 
+    // set up SPI
+    let spi: rp_pico::hal::Spi<
+        rp_pico::hal::spi::Disabled,
+        SPI0,
+        (
+            rp_pico::hal::gpio::Pin<Gpio3, FunctionSpi, PullDown>,
+            rp_pico::hal::gpio::Pin<Gpio0, FunctionSpi, PullDown>,
+            rp_pico::hal::gpio::Pin<Gpio2, FunctionSpi, PullDown>,
+        ),
+    > = bsp::hal::Spi::new(
+        pac.SPI0,
+        (
+            pins.gpio3.into_function::<gpio::FunctionSpi>(),
+            pins.gpio0.into_function::<gpio::FunctionSpi>(),
+            pins.gpio2.into_function::<gpio::FunctionSpi>(),
+        ),
+    );
+
+    // Exchange the uninitialised SPI driver for an initialised one
+    let spi = spi.init(
+        &mut pac.RESETS,
+        clocks.peripheral_clock.freq(),
+        HertzU32::from_raw(400_000), // card initialization happens at low baud rate
+        embedded_hal::spi::MODE_0,
+    );
+
+    let sd = crate::robot::file_storage::FileStorage::new(
+        spi,
+        pins.gpio1.into_push_pull_output(),
+        timer.clone(),
+    );
+
     let robot = Robot::new(
         pins.gpio10.into_push_pull_output(),
         pins.gpio11.into_push_pull_output(),
@@ -117,8 +156,8 @@ fn main() -> ! {
         pins.gpio12.into_push_pull_output(),
         channel_a,
         channel_b,
-        pins.gpio2.into_pull_up_input(),
-        pins.gpio3.into_pull_up_input(),
+        pins.gpio14.into_pull_up_input(),
+        pins.gpio15.into_pull_up_input(),
         i2c,
         pins.gpio21.into_pull_up_input(),
         pins.gpio20.into_pull_up_input(),
