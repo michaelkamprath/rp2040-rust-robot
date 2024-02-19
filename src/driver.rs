@@ -1,8 +1,7 @@
 #![allow(non_camel_case_types, dead_code)]
-use core::{cell::RefCell, fmt::Write};
+use core::fmt::Write;
 
 use crate::{model::point::Point, robot::Robot, system::millis::millis};
-use alloc::rc::Rc;
 use defmt::{debug, warn};
 use embedded_hal::{
     blocking::delay::{DelayMs, DelayUs},
@@ -22,11 +21,18 @@ pub struct Driver<
     BUTT1: InputPin,
     BUTT2: InputPin,
     TWI,
+    SPI,
+    CS: OutputPin,
     DELAY,
     LED1: OutputPin,
-> {
-    robot: Robot<INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI, DELAY>,
-    delay: Rc<RefCell<DELAY>>,
+> where
+    SPI: embedded_hal::blocking::spi::Transfer<u8> + embedded_hal::blocking::spi::Write<u8>,
+    <SPI as embedded_hal::blocking::spi::Transfer<u8>>::Error: core::fmt::Debug,
+    <SPI as embedded_hal::blocking::spi::Write<u8>>::Error: core::fmt::Debug,
+    DELAY: DelayMs<u16> + DelayUs<u16> + DelayMs<u8> + DelayUs<u8> + Copy,
+{
+    robot: Robot<INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI, SPI, CS, DELAY>,
+    delay: DELAY,
     led1: LED1,
 }
 
@@ -41,17 +47,22 @@ impl<
         BUTT2: InputPin,
         TWI,
         TWI_ERR,
+        SPI,
+        CS: OutputPin,
         DELAY,
         LED1: OutputPin,
-    > Driver<INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI, DELAY, LED1>
+    > Driver<INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI, SPI, CS, DELAY, LED1>
 where
     TWI: I2cWrite<Error = TWI_ERR> + WriteRead<Error = TWI_ERR>,
     TWI_ERR: defmt::Format,
-    DELAY: DelayMs<u16> + DelayUs<u16> + DelayMs<u8>,
+    SPI: embedded_hal::blocking::spi::Transfer<u8> + embedded_hal::blocking::spi::Write<u8>,
+    <SPI as embedded_hal::blocking::spi::Transfer<u8>>::Error: core::fmt::Debug,
+    <SPI as embedded_hal::blocking::spi::Write<u8>>::Error: core::fmt::Debug,
+    DELAY: DelayMs<u16> + DelayUs<u16> + DelayMs<u8> + DelayUs<u8> + Copy,
 {
     pub fn new(
-        robot: Robot<INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI, DELAY>,
-        delay: Rc<RefCell<DELAY>>,
+        robot: Robot<INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI, SPI, CS, DELAY>,
+        delay: DELAY,
         led1_pin: LED1,
     ) -> Self {
         Self {
@@ -67,7 +78,7 @@ where
         let start_millis = millis();
         while millis() - start_millis < ms {
             self.robot.handle_loop();
-            self.delay.borrow_mut().delay_us(500);
+            self.delay.delay_us(500_u16);
         }
     }
 

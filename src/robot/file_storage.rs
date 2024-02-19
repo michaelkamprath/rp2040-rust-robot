@@ -53,4 +53,8 @@ where
 
         Self { volume_mgr }
     }
+
+    pub fn volume_size(&mut self) -> Option<u64> {
+        self.volume_mgr.device().num_bytes().ok()
+    }
 }

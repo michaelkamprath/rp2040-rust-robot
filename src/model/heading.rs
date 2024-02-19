@@ -2,7 +2,7 @@
 
 use crate::system::millis::millis;
 use alloc::rc::Rc;
-use core::{borrow::BorrowMut, cell::RefCell, marker::PhantomData};
+use core::{cell::RefCell, marker::PhantomData};
 
 use defmt::{error, info};
 use embedded_hal::blocking::{
@@ -35,11 +35,9 @@ where
     DELAY: DelayMs<u8>,
     TWI_ERR: defmt::Format,
 {
-    pub fn new(i2c: &Rc<RefCell<TWI>>, delay: &mut Rc<RefCell<DELAY>>) -> Self {
+    pub fn new(i2c: &Rc<RefCell<TWI>>, delay: &mut DELAY) -> Self {
         let mut gyro = Mpu6050::new(i2c.clone());
-        let delay_borrowed = delay.borrow_mut();
-        let delay_ref = &mut *(**delay_borrowed).borrow_mut();
-        match gyro.init(delay_ref) {
+        match gyro.init(delay) {
             Ok(_) => {
                 info!("Gyro initialized");
             }

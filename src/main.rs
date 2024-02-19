@@ -5,12 +5,10 @@ mod model;
 mod robot;
 mod system;
 
-use alloc::rc::Rc;
 use bsp::{
     entry,
     hal::{fugit::HertzU32, gpio},
 };
-use core::cell::RefCell;
 use defmt::{info, panic};
 use defmt_rtt as _;
 use panic_probe as _;
@@ -58,7 +56,7 @@ fn main() -> ! {
 
     info!("Program start");
     let mut pac = pac::Peripherals::take().unwrap();
-    let core = pac::CorePeripherals::take().unwrap();
+    let _core = pac::CorePeripherals::take().unwrap();
     let mut watchdog = Watchdog::new(pac.WATCHDOG);
     let sio = Sio::new(pac.SIO);
 
@@ -75,11 +73,6 @@ fn main() -> ! {
     )
     .ok()
     .unwrap();
-
-    let mut delay_shared = Rc::new(RefCell::new(cortex_m::delay::Delay::new(
-        core.SYST,
-        clocks.system_clock.freq().to_Hz(),
-    )));
 
     let pins = bsp::Pins::new(
         pac.IO_BANK0,
@@ -144,7 +137,7 @@ fn main() -> ! {
         embedded_hal::spi::MODE_0,
     );
 
-    let _sd = crate::robot::file_storage::FileStorage::new(
+    let sd = crate::robot::file_storage::FileStorage::new(
         spi,
         pins.gpio1.into_push_pull_output(),
         timer,
@@ -162,14 +155,11 @@ fn main() -> ! {
         i2c,
         pins.gpio21.into_pull_up_input(),
         pins.gpio20.into_pull_up_input(),
-        &mut delay_shared,
+        sd,
+        &mut timer,
     );
 
-    let mut driver = Driver::new(
-        robot,
-        delay_shared.clone(),
-        pins.led.into_push_pull_output(),
-    );
+    let mut driver = Driver::new(robot, timer, pins.led.into_push_pull_output());
 
     info!("robot controller and driver created");
 

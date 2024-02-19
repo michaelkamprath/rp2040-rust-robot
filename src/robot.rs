@@ -7,7 +7,7 @@ mod telemetry;
 use crate::{
     model::{heading::HeadingCalculator, pid_controller::PIDController},
     robot::{
-        debouncer::DebouncedButton, motor_controller::MotorController,
+        debouncer::DebouncedButton, file_storage::FileStorage, motor_controller::MotorController,
         telemetry::straight_movement::StraightTelemetryRow,
     },
     system::{data::DataTable, millis::millis},
@@ -94,14 +94,21 @@ pub struct Robot<
     BUTT1: InputPin,
     BUTT2: InputPin,
     TWI,
+    SPI: embedded_hal::blocking::spi::Transfer<u8> + embedded_hal::blocking::spi::Write<u8>,
+    CS: OutputPin,
     DELAY,
-> {
+> where
+    <SPI as embedded_hal::blocking::spi::Transfer<u8>>::Error: core::fmt::Debug,
+    <SPI as embedded_hal::blocking::spi::Write<u8>>::Error: core::fmt::Debug,
+    DELAY: DelayMs<u16> + DelayUs<u16> + DelayMs<u8> + DelayUs<u8>,
+{
     motors: MotorController<INA1, INA2, INB1, INB2, ENA, ENB>,
     button1: DebouncedButton<BUTT1, false, BUTTON_DEBOUNCE_TIME_MS>,
     button2: DebouncedButton<BUTT2, false, BUTTON_DEBOUNCE_TIME_MS>,
     _i2c: Rc<RefCell<TWI>>,
     pub heading_calculator: HeadingCalculator<TWI, DELAY>,
     lcd: LcdBackpack<TWI, DELAY>,
+    sd_card: FileStorage<SPI, CS, DELAY>,
     reset_display_start_millis: u32,
 }
 
@@ -117,12 +124,16 @@ impl<
         BUTT2: InputPin,
         TWI,
         TWI_ERR,
+        SPI: embedded_hal::blocking::spi::Transfer<u8> + embedded_hal::blocking::spi::Write<u8>,
+        CS: OutputPin,
         DELAY,
-    > Robot<INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI, DELAY>
+    > Robot<INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI, SPI, CS, DELAY>
 where
     TWI: I2cWrite<Error = TWI_ERR> + WriteRead<Error = TWI_ERR>,
     TWI_ERR: defmt::Format,
-    DELAY: DelayMs<u16> + DelayUs<u16> + DelayMs<u8>,
+    DELAY: DelayMs<u16> + DelayUs<u16> + DelayMs<u8> + DelayUs<u8> + Copy,
+    <SPI as embedded_hal::blocking::spi::Transfer<u8>>::Error: core::fmt::Debug,
+    <SPI as embedded_hal::blocking::spi::Write<u8>>::Error: core::fmt::Debug,
 {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
@@ -137,7 +148,8 @@ where
         i2c: TWI,
         left_counter_pin: LeftWheelCounterPin,
         right_counter_pin: RightWheelCounterPin,
-        delay_shared: &mut Rc<RefCell<DELAY>>,
+        mut sd_card: FileStorage<SPI, CS, DELAY>,
+        delay: &mut DELAY,
     ) -> Self {
         // create the motor controller
         let motors = MotorController::new(ina1_pin, ina2_pin, inb1_pin, inb2_pin, ena_pin, enb_pin);
@@ -158,10 +170,10 @@ where
         }
         let i2c_shared = Rc::new(RefCell::new(i2c));
 
-        let mut heading_calculator = HeadingCalculator::new(&i2c_shared, delay_shared);
+        let mut heading_calculator = HeadingCalculator::new(&i2c_shared, delay);
         heading_calculator.reset();
 
-        let mut lcd = LcdBackpack::new(LcdDisplayType::Lcd16x2, &i2c_shared, delay_shared);
+        let mut lcd = LcdBackpack::new(LcdDisplayType::Lcd16x2, &i2c_shared, *delay);
         match lcd.init() {
             Ok(_) => {
                 info!("LCD initialized");
@@ -192,6 +204,14 @@ where
             .home()
             .and_then(LcdBackpack::clear)
             .and_then(|lcd| LcdBackpack::print(lcd, "Robot Started"))
+            .and_then(|lcd| {
+                write!(
+                    lcd.set_cursor(0, 1)?,
+                    "SD: {} GB",
+                    sd_card.volume_size().unwrap_or(0) / 1_073_741_824
+                )
+                .map_err(|_e| adafruit_lcd_backpack::Error::FormattingError)
+            })
         {
             error!("Error writing to LCD: {}", error);
         }
@@ -205,6 +225,7 @@ where
             _i2c: i2c_shared,
             heading_calculator,
             lcd,
+            sd_card,
             reset_display_start_millis: millis(), // start the display reset timer to clear the "started" message
         }
     }
@@ -576,12 +597,16 @@ impl<
         BUTT2: InputPin,
         TWI,
         TWI_ERR,
+        SPI: embedded_hal::blocking::spi::Transfer<u8> + embedded_hal::blocking::spi::Write<u8>,
+        CS: OutputPin,
         DELAY,
-    > Format for Robot<INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI, DELAY>
+    > Format for Robot<INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI, SPI, CS, DELAY>
 where
     TWI: I2cWrite<Error = TWI_ERR> + WriteRead<Error = TWI_ERR>,
     TWI_ERR: defmt::Format,
-    DELAY: DelayMs<u16> + DelayUs<u16> + DelayMs<u8>,
+    DELAY: DelayMs<u16> + DelayUs<u16> + DelayMs<u8> + DelayUs<u8> + Copy,
+    <SPI as embedded_hal::blocking::spi::Transfer<u8>>::Error: core::fmt::Debug,
+    <SPI as embedded_hal::blocking::spi::Write<u8>>::Error: core::fmt::Debug,
 {
     fn format(&self, f: defmt::Formatter) {
         defmt::write!(
@@ -605,12 +630,17 @@ impl<
         BUTT2: InputPin,
         TWI,
         TWI_ERR,
+        SPI: embedded_hal::blocking::spi::Transfer<u8> + embedded_hal::blocking::spi::Write<u8>,
+        CS: OutputPin,
         DELAY,
-    > core::fmt::Write for Robot<INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI, DELAY>
+    > core::fmt::Write
+    for Robot<INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI, SPI, CS, DELAY>
 where
     TWI: I2cWrite<Error = TWI_ERR> + WriteRead<Error = TWI_ERR>,
     TWI_ERR: defmt::Format,
-    DELAY: DelayMs<u16> + DelayUs<u16> + DelayMs<u8>,
+    DELAY: DelayMs<u16> + DelayUs<u16> + DelayMs<u8> + DelayUs<u8> + Copy,
+    <SPI as embedded_hal::blocking::spi::Transfer<u8>>::Error: core::fmt::Debug,
+    <SPI as embedded_hal::blocking::spi::Write<u8>>::Error: core::fmt::Debug,
 {
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
         self.lcd.write_str(s)
