@@ -1,6 +1,3 @@
-use core::cell::RefCell;
-
-use alloc::rc::Rc;
 use embedded_hal::blocking::delay::DelayUs;
 use embedded_hal::digital::v2::OutputPin;
 // Link in the embedded_sdmmc crate.
@@ -52,7 +49,7 @@ where
     pub fn new(spi: SPI, cs: CS, delay: DELAY) -> Self {
         info!("Initialize SPI SD/MMC data structures...");
         let sd_card = SdCard::new(spi, cs, delay);
-        let mut volume_mgr = VolumeManager::new(sd_card, DummyTimesource::default());
+        let volume_mgr = VolumeManager::new(sd_card, DummyTimesource::default());
 
         Self { volume_mgr }
     }

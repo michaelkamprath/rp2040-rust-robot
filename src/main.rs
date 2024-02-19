@@ -118,6 +118,7 @@ fn main() -> ! {
     );
 
     // set up SPI
+    #[allow(clippy::type_complexity)]
     let spi: rp_pico::hal::Spi<
         rp_pico::hal::spi::Disabled,
         SPI0,
@@ -143,10 +144,10 @@ fn main() -> ! {
         embedded_hal::spi::MODE_0,
     );
 
-    let sd = crate::robot::file_storage::FileStorage::new(
+    let _sd = crate::robot::file_storage::FileStorage::new(
         spi,
         pins.gpio1.into_push_pull_output(),
-        timer.clone(),
+        timer,
     );
 
     let robot = Robot::new(
