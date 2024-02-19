@@ -9,7 +9,7 @@ use bsp::{
     entry,
     hal::{fugit::HertzU32, gpio},
 };
-use defmt::{info, panic};
+use defmt::{error, info, panic};
 use defmt_rtt as _;
 use panic_probe as _;
 use rp2040_hal::{
@@ -143,6 +143,21 @@ fn main() -> ! {
         pins.gpio1.into_push_pull_output(),
         timer,
     );
+
+    // If SD card is successfully initialized, we can increase the SPI speed
+    match sd.spi(|spi| {
+        spi.set_baudrate(
+            clocks.peripheral_clock.freq(),
+            HertzU32::from_raw(4_000_000),
+        )
+    }) {
+        Some(speed) => {
+            info!("SPI speed increased to {}", speed.raw());
+        }
+        None => {
+            error!("Error increasing SPI speed");
+        }
+    }
 
     let robot = Robot::new(
         pins.gpio10.into_push_pull_output(),
