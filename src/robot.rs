@@ -13,7 +13,7 @@ use crate::{
     system::{data::DataTable, millis::millis},
 };
 use adafruit_lcd_backpack::{LcdBackpack, LcdDisplayType};
-use alloc::{rc::Rc, string::ToString};
+use alloc::string::ToString;
 use core::{
     self,
     cell::{Cell, RefCell},
@@ -36,6 +36,7 @@ use rp_pico::hal::{
     },
     pac::{self, interrupt},
 };
+use shared_bus::BusManagerCortexM;
 
 const UP_ARROW_CHARACTER_DEFINITION: [u8; 8] = [
     0b00000, 0b00100, 0b01110, 0b10101, 0b00100, 0b00100, 0b00100, 0b00000,
@@ -85,6 +86,7 @@ const BUTTON_DEBOUNCE_TIME_MS: u32 = 10;
 const CONTROLLER_SAMPLE_PERIOD_MS: u32 = 50;
 
 pub struct Robot<
+    'a,
     INA1: OutputPin,
     INA2: OutputPin,
     INB1: OutputPin,
@@ -94,10 +96,13 @@ pub struct Robot<
     BUTT1: InputPin,
     BUTT2: InputPin,
     TWI,
+    TWI_ERR,
     SPI: embedded_hal::blocking::spi::Transfer<u8> + embedded_hal::blocking::spi::Write<u8>,
     CS: OutputPin,
     DELAY,
 > where
+    TWI: I2cWrite<Error = TWI_ERR> + WriteRead<Error = TWI_ERR>,
+    TWI_ERR: defmt::Format,
     <SPI as embedded_hal::blocking::spi::Transfer<u8>>::Error: core::fmt::Debug,
     <SPI as embedded_hal::blocking::spi::Write<u8>>::Error: core::fmt::Debug,
     DELAY: DelayMs<u16> + DelayUs<u16> + DelayMs<u8> + DelayUs<u8>,
@@ -105,15 +110,15 @@ pub struct Robot<
     motors: MotorController<INA1, INA2, INB1, INB2, ENA, ENB>,
     button1: DebouncedButton<BUTT1, false, BUTTON_DEBOUNCE_TIME_MS>,
     button2: DebouncedButton<BUTT2, false, BUTTON_DEBOUNCE_TIME_MS>,
-    _i2c: Rc<RefCell<TWI>>,
-    pub heading_calculator: HeadingCalculator<TWI, DELAY>,
-    lcd: LcdBackpack<TWI, DELAY>,
+    pub heading_calculator: HeadingCalculator<shared_bus::I2cProxy<'a, Mutex<RefCell<TWI>>>, DELAY>,
+    lcd: LcdBackpack<shared_bus::I2cProxy<'a, Mutex<RefCell<TWI>>>, DELAY>,
     sd_card: FileStorage<SPI, CS, DELAY>,
     reset_display_start_millis: u32,
 }
 
 #[allow(dead_code, non_camel_case_types)]
 impl<
+        'a,
         INA1: OutputPin,
         INA2: OutputPin,
         INB1: OutputPin,
@@ -127,7 +132,7 @@ impl<
         SPI: embedded_hal::blocking::spi::Transfer<u8> + embedded_hal::blocking::spi::Write<u8>,
         CS: OutputPin,
         DELAY,
-    > Robot<INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI, SPI, CS, DELAY>
+    > Robot<'a, INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI, TWI_ERR, SPI, CS, DELAY>
 where
     TWI: I2cWrite<Error = TWI_ERR> + WriteRead<Error = TWI_ERR>,
     TWI_ERR: defmt::Format,
@@ -145,7 +150,7 @@ where
         enb_pin: ENB,
         button1_pin: BUTT1,
         button2_pin: BUTT2,
-        i2c: TWI,
+        i2c_manager: &'a BusManagerCortexM<TWI>,
         left_counter_pin: LeftWheelCounterPin,
         right_counter_pin: RightWheelCounterPin,
         mut sd_card: FileStorage<SPI, CS, DELAY>,
@@ -168,12 +173,12 @@ where
         unsafe {
             pac::NVIC::unmask(pac::Interrupt::IO_IRQ_BANK0);
         }
-        let i2c_shared = Rc::new(RefCell::new(i2c));
 
-        let mut heading_calculator = HeadingCalculator::new(&i2c_shared, delay);
+        let heading_i2c = i2c_manager.acquire_i2c();
+        let mut heading_calculator = HeadingCalculator::new(heading_i2c, delay);
         heading_calculator.reset();
 
-        let mut lcd = LcdBackpack::new(LcdDisplayType::Lcd16x2, &i2c_shared, *delay);
+        let mut lcd = LcdBackpack::new(LcdDisplayType::Lcd16x2, i2c_manager.acquire_i2c(), *delay);
         match lcd.init() {
             Ok(_) => {
                 info!("LCD initialized");
@@ -222,7 +227,6 @@ where
             motors,
             button1: DebouncedButton::<BUTT1, false, BUTTON_DEBOUNCE_TIME_MS>::new(button1_pin),
             button2: DebouncedButton::<BUTT2, false, BUTTON_DEBOUNCE_TIME_MS>::new(button2_pin),
-            _i2c: i2c_shared,
             heading_calculator,
             lcd,
             sd_card,
@@ -587,6 +591,7 @@ where
 
 /// Implements the defmt::Format trait for the Robot struct, allowing the Robot object to be printed with defmt
 impl<
+        'a,
         INA1: OutputPin,
         INA2: OutputPin,
         INB1: OutputPin,
@@ -600,7 +605,8 @@ impl<
         SPI: embedded_hal::blocking::spi::Transfer<u8> + embedded_hal::blocking::spi::Write<u8>,
         CS: OutputPin,
         DELAY,
-    > Format for Robot<INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI, SPI, CS, DELAY>
+    > Format
+    for Robot<'a, INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI, TWI_ERR, SPI, CS, DELAY>
 where
     TWI: I2cWrite<Error = TWI_ERR> + WriteRead<Error = TWI_ERR>,
     TWI_ERR: defmt::Format,
@@ -620,6 +626,7 @@ where
 
 /// Implement the `core::fmt::Write` trait for the robot, allowing us to use the `core::write!` macro
 impl<
+        'a,
         INA1: OutputPin,
         INA2: OutputPin,
         INB1: OutputPin,
@@ -634,7 +641,7 @@ impl<
         CS: OutputPin,
         DELAY,
     > core::fmt::Write
-    for Robot<INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI, SPI, CS, DELAY>
+    for Robot<'a, INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI, TWI_ERR, SPI, CS, DELAY>
 where
     TWI: I2cWrite<Error = TWI_ERR> + WriteRead<Error = TWI_ERR>,
     TWI_ERR: defmt::Format,

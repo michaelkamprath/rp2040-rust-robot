@@ -1,4 +1,4 @@
-#![allow(non_camel_case_types, dead_code)]
+#![allow(non_camel_case_types, dead_code, clippy::type_complexity)]
 use core::fmt::Write;
 
 use crate::{model::point::Point, robot::Robot, system::millis::millis};
@@ -12,6 +12,7 @@ use embedded_hal::{
 use micromath::F32Ext;
 
 pub struct Driver<
+    'a,
     INA1: OutputPin,
     INA2: OutputPin,
     INB1: OutputPin,
@@ -21,22 +22,26 @@ pub struct Driver<
     BUTT1: InputPin,
     BUTT2: InputPin,
     TWI,
+    TWI_ERR,
     SPI,
     CS: OutputPin,
     DELAY,
     LED1: OutputPin,
 > where
+    TWI: I2cWrite<Error = TWI_ERR> + WriteRead<Error = TWI_ERR>,
+    TWI_ERR: defmt::Format,
     SPI: embedded_hal::blocking::spi::Transfer<u8> + embedded_hal::blocking::spi::Write<u8>,
     <SPI as embedded_hal::blocking::spi::Transfer<u8>>::Error: core::fmt::Debug,
     <SPI as embedded_hal::blocking::spi::Write<u8>>::Error: core::fmt::Debug,
     DELAY: DelayMs<u16> + DelayUs<u16> + DelayMs<u8> + DelayUs<u8> + Copy,
 {
-    robot: Robot<INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI, SPI, CS, DELAY>,
+    robot: Robot<'a, INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI, TWI_ERR, SPI, CS, DELAY>,
     delay: DELAY,
     led1: LED1,
 }
 
 impl<
+        'a,
         INA1: OutputPin,
         INA2: OutputPin,
         INB1: OutputPin,
@@ -51,7 +56,7 @@ impl<
         CS: OutputPin,
         DELAY,
         LED1: OutputPin,
-    > Driver<INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI, SPI, CS, DELAY, LED1>
+    > Driver<'a, INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI, TWI_ERR, SPI, CS, DELAY, LED1>
 where
     TWI: I2cWrite<Error = TWI_ERR> + WriteRead<Error = TWI_ERR>,
     TWI_ERR: defmt::Format,
@@ -61,7 +66,22 @@ where
     DELAY: DelayMs<u16> + DelayUs<u16> + DelayMs<u8> + DelayUs<u8> + Copy,
 {
     pub fn new(
-        robot: Robot<INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI, SPI, CS, DELAY>,
+        robot: Robot<
+            'a,
+            INA1,
+            INA2,
+            INB1,
+            INB2,
+            ENA,
+            ENB,
+            BUTT1,
+            BUTT2,
+            TWI,
+            TWI_ERR,
+            SPI,
+            CS,
+            DELAY,
+        >,
         delay: DELAY,
         led1_pin: LED1,
     ) -> Self {

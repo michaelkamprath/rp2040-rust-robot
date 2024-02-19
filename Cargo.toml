@@ -13,23 +13,19 @@ bench = false
 cortex-m = "0.7"
 cortex-m-rt = "0.7"
 embedded-hal = { version = "0.2", features = ["unproven"] }
-
 embedded-sdmmc = { version = "0.6", default-features = false, features = [
     "defmt-log",
 ] }
+shared-bus = { version = "0.3", features = ["cortex-m"] }
 defmt = "0.3"
 defmt-rtt = "0.4"
 panic-probe = { version = "0.3", features = ["print-defmt"] }
 micromath = { version = "2.1", features = ["vector"] }
 mpu6050 = { git = "https://github.com/michaelkamprath/mpu6050.git", branch = "micromath", features = [
     "defmt",
-    "shared_i2c",
 ] }
 embedded-alloc = "0.5"
-adafruit-lcd-backpack = { git = "https://github.com/michaelkamprath/adafruit-lcd-backpack-rust.git", features = [
-    "shared_i2c",
-    "defmt",
-] }
+adafruit-lcd-backpack = { version = "0.1", features = ["defmt"] }
 
 # We're using a Pico by default on this template
 rp-pico = "0.8"
@@ -100,5 +96,5 @@ opt-level = 3
 # [patch."https://github.com/michaelkamprath/mpu6050.git"]
 # mpu6050 = { path = "../mpu6050" }
 
-[patch."https://github.com/michaelkamprath/adafruit-lcd-backpack-rust.git"]
-adafruit-lcd-backpack = { path = "../adafruit-lcd-backpack-rust" }
+# [patch."https://github.com/michaelkamprath/adafruit-lcd-backpack-rust.git"]
+# adafruit-lcd-backpack = { path = "../adafruit-lcd-backpack-rust" }

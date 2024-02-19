@@ -14,10 +14,10 @@ use defmt_rtt as _;
 use panic_probe as _;
 use rp2040_hal::{
     gpio::{
-        bank0::{Gpio0, Gpio2, Gpio3},
-        FunctionSpi, PullDown,
+        bank0::{Gpio0, Gpio2, Gpio3, Gpio4, Gpio5},
+        FunctionI2c, FunctionSpi, Pin, PullDown,
     },
-    pac::SPI0,
+    pac::{I2C0, SPI0},
 };
 
 // Provide an alias for our BSP so we can switch targets quickly.
@@ -109,6 +109,7 @@ fn main() -> ! {
         &mut pac.RESETS,
         clocks.system_clock.freq(),
     );
+    let i2c_manager: &'static _ = shared_bus::new_cortexm!(rp2040_hal::I2C<I2C0, (Pin<Gpio4, FunctionI2c, PullDown>, Pin<Gpio5, FunctionI2c, PullDown>)> = i2c).unwrap();
 
     // set up SPI
     #[allow(clippy::type_complexity)]
@@ -152,7 +153,7 @@ fn main() -> ! {
         channel_b,
         pins.gpio14.into_pull_up_input(),
         pins.gpio15.into_pull_up_input(),
-        i2c,
+        i2c_manager,
         pins.gpio21.into_pull_up_input(),
         pins.gpio20.into_pull_up_input(),
         sd,

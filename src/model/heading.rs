@@ -1,8 +1,7 @@
 #![allow(non_camel_case_types)]
 
 use crate::system::millis::millis;
-use alloc::rc::Rc;
-use core::{cell::RefCell, marker::PhantomData};
+use core::marker::PhantomData;
 
 use defmt::{error, info};
 use embedded_hal::blocking::{
@@ -35,8 +34,8 @@ where
     DELAY: DelayMs<u8>,
     TWI_ERR: defmt::Format,
 {
-    pub fn new(i2c: &Rc<RefCell<TWI>>, delay: &mut DELAY) -> Self {
-        let mut gyro = Mpu6050::new(i2c.clone());
+    pub fn new(i2c: TWI, delay: &mut DELAY) -> Self {
+        let mut gyro = Mpu6050::new(i2c);
         match gyro.init(delay) {
             Ok(_) => {
                 info!("Gyro initialized");
