@@ -45,17 +45,18 @@ impl Point {
         let x_diff = -(other.x - self.x);
         let y_diff = other.y - self.y;
         let bearing = (x_diff as f32).atan2(y_diff as f32).to_degrees();
-        if other.forward {
+        let raw_bearing = if other.forward {
             bearing
         } else {
-            let reverse = bearing + 180.0;
-            if reverse > 180.0 {
-                reverse - 360.0
-            } else if reverse < -180.0 {
-                reverse + 360.0
-            } else {
-                reverse
-            }
+            bearing + 180.0
+        };
+
+        if raw_bearing > 180.0 {
+            raw_bearing - 360.0
+        } else if raw_bearing < -180.0 {
+            raw_bearing + 360.0
+        } else {
+            raw_bearing
         }
     }
 }

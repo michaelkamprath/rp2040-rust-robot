@@ -633,7 +633,7 @@ where
     }
 
     pub fn turn(&mut self, angle_degrees: i32) -> &mut Self {
-        const TURN_MIN_POWER: f32 = 0.35;
+        const TURN_MIN_POWER: f32 = 0.50;
         if angle_degrees.abs() < self.min_turn_angle() as i32 {
             debug!("Turn angle {} too small, not turning", angle_degrees);
             return self;
@@ -641,7 +641,15 @@ where
 
         info!("Robot turn, angle = {}", angle_degrees);
         self.reset_wheel_counters();
-        let direction_str = if angle_degrees > 0 {
+        let turn_degrees = if angle_degrees > 180 {
+            angle_degrees - 360
+        } else if angle_degrees < -180 {
+            angle_degrees + 360
+        } else {
+            angle_degrees
+        };
+
+        let direction_str = if turn_degrees > 0 {
             LEFT_ARROW_STRING
         } else {
             RIGHT_ARROW_STRING
@@ -650,7 +658,7 @@ where
             self.clear_lcd().set_lcd_cursor(0, 0),
             "{} 0 / {}\x03",
             direction_str,
-            angle_degrees,
+            turn_degrees,
         ) {
             error!("Error writing to LCD: {}", error.to_string().as_str());
         }
@@ -662,7 +670,7 @@ where
         // motor A is the left motor, motor B is the right motor
         self.motors
             .set_duty(self.noramlize_duty(1.), self.noramlize_duty(1.));
-        if angle_degrees > 0 {
+        if turn_degrees > 0 {
             self.motors.reverse_a();
             self.motors.forward_b();
         } else {
@@ -670,12 +678,12 @@ where
             self.motors.reverse_b();
         }
 
-        while current_angle.abs() < (angle_degrees.abs() - 12) as f32 {
+        while current_angle.abs() < (turn_degrees.abs() - 12) as f32 {
             current_angle = self.heading_calculator.heading();
 
             if (current_angle - last_adjust_angle).abs() > 5.0 {
                 last_adjust_angle = current_angle;
-                let abs_angle = angle_degrees.abs() as f32;
+                let abs_angle = turn_degrees.abs() as f32;
                 let motor_power = TURN_MIN_POWER
                     + (1.0 - TURN_MIN_POWER) * ((abs_angle - current_angle.abs()) / abs_angle);
                 self.motors.set_duty(
@@ -688,7 +696,7 @@ where
                 "{} {} / {}\x03",
                 direction_str,
                 current_angle as i32,
-                angle_degrees,
+                turn_degrees,
             ) {
                 error!("Error writing to LCD: {}", error.to_string().as_str());
             }
@@ -707,7 +715,7 @@ where
                     "{} {} / {}\x03",
                     direction_str,
                     current_angle as i32,
-                    angle_degrees,
+                    turn_degrees,
                 ) {
                     error!("Error writing to LCD: {}", error.to_string().as_str());
                 }
@@ -719,7 +727,7 @@ where
             "{} {} / {}\x03",
             direction_str,
             current_angle as i32,
-            angle_degrees,
+            turn_degrees,
         ) {
             error!("Error writing to LCD: {}", error.to_string().as_str());
         }

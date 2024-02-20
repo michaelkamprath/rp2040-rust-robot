@@ -109,6 +109,12 @@ where
                 Point::new(0, 0),
                 Point::new(0, 500),
                 Point::new_with_forward(0, 0, false),
+                Point::new(500, 0),
+                Point::new_with_forward(0, 0, false),
+                Point::new(0, -500),
+                Point::new_with_forward(0, 0, false),
+                Point::new(-500, 0),
+                Point::new_with_forward(0, 0, false),
             ]);
             self.led1.set_low().ok();
         }
