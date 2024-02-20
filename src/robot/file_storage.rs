@@ -7,7 +7,8 @@ use embedded_hal::digital::v2::OutputPin;
 // The `SdMmcSpi` is used for block level access to the card.
 // And the `VolumeManager` gives access to the FAT filesystem functions.
 use embedded_sdmmc::{
-    Directory, Mode, SdCard, TimeSource, Timestamp, Volume, VolumeIdx, VolumeManager,
+    DirEntry, Directory, Mode, SdCard, SdCardError, TimeSource, Timestamp, Volume, VolumeIdx,
+    VolumeManager,
 };
 
 // Get the file open mode enum:
@@ -108,6 +109,12 @@ where
         }
     }
 
+    pub fn volume_manager(
+        &self,
+    ) -> Option<Rc<RefCell<VolumeManager<SdCard<SPI, CS, DELAY>, DummyTimesource>>>> {
+        self.volume_mgr.clone()
+    }
+
     pub fn volume_size(&mut self) -> Option<u64> {
         match self.volume_mgr {
             None => None,
@@ -129,6 +136,21 @@ where
         self.root_dir
     }
 
+    pub fn open_dir(&self, parent: Directory, name: &str) -> Option<Directory> {
+        match self
+            .volume_mgr
+            .as_ref()?
+            .borrow_mut()
+            .open_dir(parent, name)
+        {
+            Ok(dir) => Some(dir),
+            Err(e) => {
+                error!("Error opening directory '{}': {:?}", name, e);
+                None
+            }
+        }
+    }
+
     pub fn spi<T, F>(&self, func: F) -> Option<T>
     where
         F: FnOnce(&mut SPI) -> T,
@@ -144,29 +166,48 @@ where
     }
 
     pub fn open_file_in_dir(
-        &self,
+        &mut self,
         filename: &str,
         directory: Directory,
         mode: Mode,
-    ) -> Option<SDFile<SPI, CS, DELAY>> {
-        let file = match self
-            .volume_mgr
-            .as_ref()?
-            .as_ref()
+    ) -> Result<SDFile<SPI, CS, DELAY>, embedded_sdmmc::Error<SdCardError>> {
+        let volume_manager = match self.volume_mgr.as_mut() {
+            Some(vm) => vm,
+            None => {
+                return Err(embedded_sdmmc::Error::AllocationError);
+            }
+        };
+        let file = match volume_manager
             .borrow_mut()
             .open_file_in_dir(directory, filename, mode)
         {
             Ok(f) => f,
             Err(e) => {
                 error!("Error opening file '{}': {:?}", filename, e);
-                return None;
+                return Err(e);
             }
         };
-        Some(SDFile::new(
+        Ok(SDFile::new(
             filename,
             file,
+            mode,
             self.volume_mgr.as_ref().unwrap().clone(),
         ))
+    }
+
+    pub fn iterate_dir<F>(
+        &self,
+        dir: Directory,
+        func: F,
+    ) -> Result<(), embedded_sdmmc::Error<SdCardError>>
+    where
+        F: FnMut(&DirEntry),
+    {
+        self.volume_mgr
+            .as_ref()
+            .unwrap()
+            .borrow_mut()
+            .iterate_dir(dir, func)
     }
 }
 
@@ -213,6 +254,7 @@ where
 {
     filename: String,
     file: embedded_sdmmc::File,
+    mode: Mode,
     volume_manager: Rc<RefCell<VolumeManager<SdCard<SPI, CS, DELAY>, DummyTimesource>>>,
 }
 
@@ -227,27 +269,30 @@ where
     pub fn new(
         filename: &str,
         file: embedded_sdmmc::File,
+        mode: Mode,
         volume_manager: Rc<RefCell<VolumeManager<SdCard<SPI, CS, DELAY>, DummyTimesource>>>,
     ) -> Self {
         Self {
             filename: String::from(filename),
             file,
+            mode,
             volume_manager,
         }
     }
 
-    pub fn read<E: core::fmt::Debug>(
-        &mut self,
-        _buf: &mut [u8],
-    ) -> Result<usize, embedded_sdmmc::Error<E>> {
-        Ok(0)
+    pub fn length(&self) -> Result<u32, embedded_sdmmc::Error<SdCardError>> {
+        self.volume_manager.borrow().file_length(self.file)
     }
 
-    pub fn write<E: core::fmt::Debug>(
-        &mut self,
-        _buf: &[u8],
-    ) -> Result<usize, embedded_sdmmc::Error<E>> {
-        Ok(0)
+    pub fn read(&mut self, buf: &mut [u8]) -> Result<usize, embedded_sdmmc::Error<SdCardError>> {
+        self.volume_manager.borrow_mut().read(self.file, buf)
+    }
+
+    pub fn write(&mut self, buf: &[u8]) -> Result<usize, embedded_sdmmc::Error<SdCardError>> {
+        if self.mode == Mode::ReadOnly {
+            return Err(embedded_sdmmc::Error::ReadOnly);
+        }
+        self.volume_manager.borrow_mut().write(self.file, buf)
     }
 }
 

@@ -13,14 +13,18 @@ use crate::{
     system::{data::DataTable, millis::millis},
 };
 use adafruit_lcd_backpack::{LcdBackpack, LcdDisplayType};
-use alloc::string::ToString;
+use alloc::{
+    format,
+    string::{String, ToString},
+    vec,
+};
 use core::{
     self,
     cell::{Cell, RefCell},
     fmt::Write,
 };
 use cortex_m::interrupt::Mutex;
-use defmt::{debug, error, info, Format};
+use defmt::{debug, error, info, warn, Format};
 use embedded_hal::{
     blocking::delay::{DelayMs, DelayUs},
     blocking::i2c::{Write as I2cWrite, WriteRead},
@@ -55,6 +59,11 @@ const RIGHT_ARROW_STRING: &str = "\x7E";
 const DEGREES_STRING: &str = "\x03";
 
 const DISPLAY_RESET_DELAY_MS: u32 = 5000;
+//==============================================================================
+// Directory and File namses
+//
+const LOG_DIR_NAME: &str = "log";
+const LOG_INDEX_FILE_NAME: &str = "index.txt";
 
 //==============================================================================
 // Interrupt pins and counters for wheel encoders
@@ -114,6 +123,7 @@ pub struct Robot<
     lcd: LcdBackpack<shared_bus::I2cProxy<'a, Mutex<RefCell<TWI>>>, DELAY>,
     sd_card: FileStorage<SPI, CS, DELAY>,
     reset_display_start_millis: u32,
+    log_index: u32,
 }
 
 #[allow(dead_code, non_camel_case_types)]
@@ -231,9 +241,160 @@ where
             lcd,
             sd_card,
             reset_display_start_millis: millis(), // start the display reset timer to clear the "started" message
+            log_index: 0,
         }
     }
 
+    /// Inits the Robot software. This function should be called after the robot is created.
+    pub fn init(&mut self) -> Result<(), embedded_sdmmc::Error<embedded_sdmmc::SdCardError>> {
+        self.init_log_file()?;
+
+        Ok(())
+    }
+
+    /// Initializes the log file and log file index
+    fn init_log_file(&mut self) -> Result<(), embedded_sdmmc::Error<embedded_sdmmc::SdCardError>> {
+        // open log directory
+        let root_dir = match self.sd_card.root_dir() {
+            Some(dir) => dir,
+            None => {
+                error!("Error opening root dir");
+                return Err(embedded_sdmmc::Error::DeviceError(
+                    embedded_sdmmc::SdCardError::CardNotFound,
+                ));
+            }
+        };
+        let log_dir = match self.sd_card.open_dir(root_dir, LOG_DIR_NAME) {
+            Some(dir) => dir,
+            None => {
+                error!("Error opening log dir");
+                return Err(embedded_sdmmc::Error::DirAlreadyOpen);
+            }
+        };
+
+        // open log index file
+        let log_index = match self.sd_card.open_file_in_dir(
+            LOG_INDEX_FILE_NAME,
+            log_dir,
+            embedded_sdmmc::Mode::ReadOnly,
+        ) {
+            Ok(mut file) => {
+                // log index file exists. read contents.
+                let file_len = file.length().unwrap_or(0);
+                if file_len == 0 {
+                    warn!("Log index file is empty. Starting log index at 0");
+                    0
+                } else {
+                    let mut buffer = vec![0u8; file_len as usize];
+                    if let Err(e) = file.read(buffer.as_mut_slice()) {
+                        error!("Error reading log index file: {:?}", e);
+                        0
+                    } else {
+                        let contents = String::from_utf8(buffer).unwrap_or_default();
+                        debug!("Log index file contents:\n{:?}", contents.as_str());
+                        match contents.parse::<u32>() {
+                            Ok(index) => index + 1,
+                            Err(e) => {
+                                error!(
+                                    "Error parsing log index file contents: {:?}",
+                                    e.to_string().as_str()
+                                );
+                                0
+                            }
+                        }
+                    }
+                }
+            }
+            Err(_e) => {
+                warn!("Error opening log index file contents. Starting log index at 0");
+                0
+            }
+        };
+
+        // write the new log index back to the file
+        match self.sd_card.open_file_in_dir(
+            LOG_INDEX_FILE_NAME,
+            log_dir,
+            embedded_sdmmc::Mode::ReadWriteCreateOrTruncate,
+        ) {
+            Ok(mut file) => {
+                let contents = format!("{}", log_index);
+                if let Err(e) = file.write(contents.as_bytes()) {
+                    error!("Error writing log index file: {:?}", e);
+                } else {
+                    info!("Log index file updated to {}", log_index);
+                }
+            }
+            Err(e) => {
+                error!("Error opening log index file for writing: {:?}", e);
+            }
+        }
+        info!("Log index = {}", log_index);
+        self.log_index = log_index;
+
+        Ok(())
+    }
+
+    pub fn test_sdcard(
+        &mut self,
+    ) -> Result<(), embedded_sdmmc::Error<embedded_sdmmc::SdCardError>> {
+        let root_dir = self.sd_card.root_dir().unwrap();
+        let mut found_files: vec::Vec<String> = vec::Vec::new();
+        if let Err(e) = self.sd_card.iterate_dir(root_dir, |entry| {
+            if entry.attributes.is_volume() {
+                info!(
+                    "Volume name is: {}, attributes = {:?}",
+                    entry.name.to_string().as_str(),
+                    entry.attributes,
+                );
+            } else if entry.attributes.is_directory() {
+                info!(
+                    "Root directory directory: {}, attributes = {:?}",
+                    entry.name.to_string().as_str(),
+                    entry.attributes,
+                );
+            } else {
+                let filename = entry.name.to_string();
+                info!(
+                    "Root directory file: {}, attributes = {:?}",
+                    filename.as_str(),
+                    entry.attributes,
+                );
+                found_files.push(filename);
+            }
+        }) {
+            error!("Error iterating root dir: {}", e);
+        }
+
+        for filename in found_files.iter() {
+            if let Ok(mut file) = self.sd_card.open_file_in_dir(
+                filename.as_str(),
+                root_dir,
+                embedded_sdmmc::Mode::ReadOnly,
+            ) {
+                let file_size = match file.length() {
+                    Ok(size) => size,
+                    Err(e) => {
+                        error!("Error getting file size: {:?}", e);
+                        0
+                    }
+                };
+
+                let mut buffer = vec![0u8; file_size as usize];
+                if let Err(e) = file.read(buffer.as_mut_slice()) {
+                    error!("Error reading file: {:?}", e);
+                } else {
+                    let contents = String::from_utf8_lossy(&buffer).to_string();
+                    info!(
+                        "File '{}' contents:\n{:?}",
+                        filename.as_str(),
+                        contents.as_str()
+                    );
+                }
+            }
+        }
+        Ok(())
+    }
     /// This function is called in the main loop to allow the robot to handle state updates
     pub fn handle_loop(&mut self) {
         if self.reset_display_start_millis != 0

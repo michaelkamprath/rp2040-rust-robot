@@ -159,7 +159,7 @@ fn main() -> ! {
         }
     }
 
-    let robot = Robot::new(
+    let mut robot = Robot::new(
         pins.gpio10.into_push_pull_output(),
         pins.gpio11.into_push_pull_output(),
         pins.gpio13.into_push_pull_output(),
@@ -174,6 +174,10 @@ fn main() -> ! {
         sd,
         &mut timer,
     );
+
+    if let Err(e) = robot.init() {
+        panic!("Error initializing SD card: {:?}", e);
+    }
 
     let mut driver = Driver::new(robot, timer, pins.led.into_push_pull_output());
 
