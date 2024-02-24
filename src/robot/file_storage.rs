@@ -1,18 +1,17 @@
 #![allow(clippy::type_complexity)]
-use alloc::{rc::Rc, string::String};
+pub mod logger;
+pub mod sd_file;
+
+use alloc::rc::Rc;
 use core::cell::RefCell;
+use defmt::{debug, error, info};
 use embedded_hal::blocking::delay::DelayUs;
 use embedded_hal::digital::v2::OutputPin;
-// Link in the embedded_sdmmc crate.
-// The `SdMmcSpi` is used for block level access to the card.
-// And the `VolumeManager` gives access to the FAT filesystem functions.
 use embedded_sdmmc::{
     DirEntry, Directory, Mode, SdCard, SdCardError, TimeSource, Timestamp, Volume, VolumeIdx,
     VolumeManager,
 };
-
-// Get the file open mode enum:
-use defmt::{debug, error, info};
+use sd_file::SDFile;
 
 /// A dummy timesource, which is mostly important for creating files.
 #[derive(Default)]
@@ -171,25 +170,9 @@ where
         directory: Directory,
         mode: Mode,
     ) -> Result<SDFile<SPI, CS, DELAY>, embedded_sdmmc::Error<SdCardError>> {
-        let volume_manager = match self.volume_mgr.as_mut() {
-            Some(vm) => vm,
-            None => {
-                return Err(embedded_sdmmc::Error::AllocationError);
-            }
-        };
-        let file = match volume_manager
-            .borrow_mut()
-            .open_file_in_dir(directory, filename, mode)
-        {
-            Ok(f) => f,
-            Err(e) => {
-                error!("Error opening file '{}': {:?}", filename, e);
-                return Err(e);
-            }
-        };
         Ok(SDFile::new(
             filename,
-            file,
+            directory,
             mode,
             self.volume_mgr.as_ref().unwrap().clone(),
         ))
@@ -240,84 +223,6 @@ where
                 }
             }
             None => {}
-        }
-    }
-}
-
-pub struct SDFile<SPI, CS, DELAY>
-where
-    SPI: embedded_hal::blocking::spi::Transfer<u8> + embedded_hal::blocking::spi::Write<u8>,
-    <SPI as embedded_hal::blocking::spi::Transfer<u8>>::Error: core::fmt::Debug,
-    <SPI as embedded_hal::blocking::spi::Write<u8>>::Error: core::fmt::Debug,
-    CS: OutputPin,
-    DELAY: DelayUs<u8>,
-{
-    filename: String,
-    file: embedded_sdmmc::File,
-    mode: Mode,
-    volume_manager: Rc<RefCell<VolumeManager<SdCard<SPI, CS, DELAY>, DummyTimesource>>>,
-}
-
-impl<SPI, CS, DELAY> SDFile<SPI, CS, DELAY>
-where
-    SPI: embedded_hal::blocking::spi::Transfer<u8> + embedded_hal::blocking::spi::Write<u8>,
-    <SPI as embedded_hal::blocking::spi::Transfer<u8>>::Error: core::fmt::Debug,
-    <SPI as embedded_hal::blocking::spi::Write<u8>>::Error: core::fmt::Debug,
-    CS: OutputPin,
-    DELAY: DelayUs<u8>,
-{
-    pub fn new(
-        filename: &str,
-        file: embedded_sdmmc::File,
-        mode: Mode,
-        volume_manager: Rc<RefCell<VolumeManager<SdCard<SPI, CS, DELAY>, DummyTimesource>>>,
-    ) -> Self {
-        Self {
-            filename: String::from(filename),
-            file,
-            mode,
-            volume_manager,
-        }
-    }
-
-    pub fn length(&self) -> Result<u32, embedded_sdmmc::Error<SdCardError>> {
-        self.volume_manager.borrow().file_length(self.file)
-    }
-
-    pub fn read(&mut self, buf: &mut [u8]) -> Result<usize, embedded_sdmmc::Error<SdCardError>> {
-        self.volume_manager.borrow_mut().read(self.file, buf)
-    }
-
-    pub fn write(&mut self, buf: &[u8]) -> Result<usize, embedded_sdmmc::Error<SdCardError>> {
-        if self.mode == Mode::ReadOnly {
-            return Err(embedded_sdmmc::Error::ReadOnly);
-        }
-        self.volume_manager.borrow_mut().write(self.file, buf)
-    }
-}
-
-impl<SPI, CS, DELAY> Drop for SDFile<SPI, CS, DELAY>
-where
-    SPI: embedded_hal::blocking::spi::Transfer<u8> + embedded_hal::blocking::spi::Write<u8>,
-    <SPI as embedded_hal::blocking::spi::Transfer<u8>>::Error: core::fmt::Debug,
-    <SPI as embedded_hal::blocking::spi::Write<u8>>::Error: core::fmt::Debug,
-    CS: OutputPin,
-    DELAY: DelayUs<u8>,
-{
-    fn drop(&mut self) {
-        if let Err(e) = self
-            .volume_manager
-            .as_ref()
-            .borrow_mut()
-            .close_file(self.file)
-        {
-            error!(
-                "Error closing file '{}' at drop: {:?}",
-                self.filename.as_str(),
-                e
-            );
-        } else {
-            debug!("File '{}' dropped", self.filename.as_str());
         }
     }
 }

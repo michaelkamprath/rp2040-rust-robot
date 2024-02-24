@@ -148,7 +148,7 @@ fn main() -> ! {
     match sd.spi(|spi| {
         spi.set_baudrate(
             clocks.peripheral_clock.freq(),
-            HertzU32::from_raw(4_000_000),
+            HertzU32::from_raw(20_000_000),
         )
     }) {
         Some(speed) => {

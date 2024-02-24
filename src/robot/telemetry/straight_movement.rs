@@ -60,3 +60,19 @@ impl defmt::Format for StraightTelemetryRow {
         );
     }
 }
+
+impl core::fmt::Display for StraightTelemetryRow {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(
+            f,
+            "{},{},{},{},{},{},{}",
+            self.time,
+            self.left_wheel_ticks,
+            self.right_wheel_ticks,
+            self.left_motor_power,
+            self.right_motor_power,
+            self.heading,
+            self.control_signal,
+        )
+    }
+}

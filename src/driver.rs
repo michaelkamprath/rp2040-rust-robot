@@ -4,8 +4,10 @@ use core::fmt::Write;
 use crate::{model::point::Point, robot::Robot, system::millis::millis};
 use defmt::{debug, warn};
 use embedded_hal::{
-    blocking::delay::{DelayMs, DelayUs},
-    blocking::i2c::{Write as I2cWrite, WriteRead},
+    blocking::{
+        delay::{DelayMs, DelayUs},
+        i2c::{Write as I2cWrite, WriteRead},
+    },
     digital::v2::{InputPin, OutputPin},
     PwmPin,
 };
@@ -136,6 +138,14 @@ where
             warn!("trace_path: point_sequence too short");
             return;
         }
+        writeln!(
+            self.robot.logger,
+            "TRACE_PATH: starting trace path with {} points at {} ms",
+            point_sequence.len(),
+            millis(),
+        )
+        .ok();
+
         let mut cur_point = point_sequence[0];
         // start with the bearing from the first point to the second point
         let mut cur_bearing: f32 = point_sequence[0].absolute_bearing(&point_sequence[1]);
@@ -145,7 +155,12 @@ where
             let bearing = cur_point.absolute_bearing(next_point);
             let bearing_diff = bearing - cur_bearing;
             debug!("driving to next way point\n  cur_point: {:?}, next_point: {:?}\n  distance: {}, bearing {}, forward: {}", cur_point, next_point, distance, bearing, next_point.forward());
-
+            writeln!(
+                self.robot.logger,
+                "MOVE: from way point {:?} to way point {:?}",
+                cur_point, next_point
+            )
+            .ok();
             // turn to the correct bearing
             if bearing_diff.abs() > self.robot.min_turn_angle() {
                 self.robot.turn(bearing_diff as i32);

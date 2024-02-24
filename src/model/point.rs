@@ -66,3 +66,9 @@ impl Format for Point {
         defmt::write!(f, "({}, {})", self.x, self.y);
     }
 }
+
+impl core::fmt::Display for Point {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        write!(f, "({}, {})", self.x, self.y)
+    }
+}
