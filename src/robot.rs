@@ -1,18 +1,21 @@
 #![allow(non_camel_case_types, dead_code)]
 mod debouncer;
+pub mod file_storage;
 mod motor_controller;
 mod telemetry;
 
 use crate::{
     model::{heading::HeadingCalculator, pid_controller::PIDController},
     robot::{
-        debouncer::DebouncedButton, motor_controller::MotorController,
+        debouncer::DebouncedButton,
+        file_storage::{logger::Logger, FileStorage},
+        motor_controller::MotorController,
         telemetry::straight_movement::StraightTelemetryRow,
     },
     system::{data::DataTable, millis::millis},
 };
 use adafruit_lcd_backpack::{LcdBackpack, LcdDisplayType};
-use alloc::{rc::Rc, string::ToString};
+use alloc::string::ToString;
 use core::{
     self,
     cell::{Cell, RefCell},
@@ -21,8 +24,10 @@ use core::{
 use cortex_m::interrupt::Mutex;
 use defmt::{debug, error, info, Format};
 use embedded_hal::{
-    blocking::delay::{DelayMs, DelayUs},
-    blocking::i2c::{Write as I2cWrite, WriteRead},
+    blocking::{
+        delay::{DelayMs, DelayUs},
+        i2c::{Write as I2cWrite, WriteRead},
+    },
     digital::v2::{InputPin, OutputPin},
     PwmPin,
 };
@@ -35,6 +40,7 @@ use rp_pico::hal::{
     },
     pac::{self, interrupt},
 };
+use shared_bus::BusManagerCortexM;
 
 const UP_ARROW_CHARACTER_DEFINITION: [u8; 8] = [
     0b00000, 0b00100, 0b01110, 0b10101, 0b00100, 0b00100, 0b00100, 0b00000,
@@ -84,6 +90,7 @@ const BUTTON_DEBOUNCE_TIME_MS: u32 = 10;
 const CONTROLLER_SAMPLE_PERIOD_MS: u32 = 50;
 
 pub struct Robot<
+    'a,
     INA1: OutputPin,
     INA2: OutputPin,
     INB1: OutputPin,
@@ -93,19 +100,31 @@ pub struct Robot<
     BUTT1: InputPin,
     BUTT2: InputPin,
     TWI,
+    TWI_ERR,
+    SPI: embedded_hal::blocking::spi::Transfer<u8> + embedded_hal::blocking::spi::Write<u8>,
+    CS: OutputPin,
     DELAY,
-> {
+> where
+    TWI: I2cWrite<Error = TWI_ERR> + WriteRead<Error = TWI_ERR>,
+    TWI_ERR: defmt::Format,
+    <SPI as embedded_hal::blocking::spi::Transfer<u8>>::Error: core::fmt::Debug,
+    <SPI as embedded_hal::blocking::spi::Write<u8>>::Error: core::fmt::Debug,
+    DELAY: DelayMs<u16> + DelayUs<u16> + DelayMs<u8> + DelayUs<u8>,
+{
     motors: MotorController<INA1, INA2, INB1, INB2, ENA, ENB>,
     button1: DebouncedButton<BUTT1, false, BUTTON_DEBOUNCE_TIME_MS>,
     button2: DebouncedButton<BUTT2, false, BUTTON_DEBOUNCE_TIME_MS>,
-    _i2c: Rc<RefCell<TWI>>,
-    pub heading_calculator: HeadingCalculator<TWI, DELAY>,
-    lcd: LcdBackpack<TWI, DELAY>,
+    pub heading_calculator: HeadingCalculator<shared_bus::I2cProxy<'a, Mutex<RefCell<TWI>>>, DELAY>,
+    lcd: LcdBackpack<shared_bus::I2cProxy<'a, Mutex<RefCell<TWI>>>, DELAY>,
+    sd_card: FileStorage<SPI, CS, DELAY>,
     reset_display_start_millis: u32,
+    log_index: u32,
+    pub logger: Logger<SPI, CS, DELAY, 128>,
 }
 
 #[allow(dead_code, non_camel_case_types)]
 impl<
+        'a,
         INA1: OutputPin,
         INA2: OutputPin,
         INB1: OutputPin,
@@ -116,12 +135,16 @@ impl<
         BUTT2: InputPin,
         TWI,
         TWI_ERR,
+        SPI: embedded_hal::blocking::spi::Transfer<u8> + embedded_hal::blocking::spi::Write<u8>,
+        CS: OutputPin,
         DELAY,
-    > Robot<INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI, DELAY>
+    > Robot<'a, INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI, TWI_ERR, SPI, CS, DELAY>
 where
     TWI: I2cWrite<Error = TWI_ERR> + WriteRead<Error = TWI_ERR>,
     TWI_ERR: defmt::Format,
-    DELAY: DelayMs<u16> + DelayUs<u16> + DelayMs<u8>,
+    DELAY: DelayMs<u16> + DelayUs<u16> + DelayMs<u8> + DelayUs<u8> + Copy,
+    <SPI as embedded_hal::blocking::spi::Transfer<u8>>::Error: core::fmt::Debug,
+    <SPI as embedded_hal::blocking::spi::Write<u8>>::Error: core::fmt::Debug,
 {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
@@ -133,10 +156,11 @@ where
         enb_pin: ENB,
         button1_pin: BUTT1,
         button2_pin: BUTT2,
-        i2c: TWI,
+        i2c_manager: &'a BusManagerCortexM<TWI>,
         left_counter_pin: LeftWheelCounterPin,
         right_counter_pin: RightWheelCounterPin,
-        delay_shared: &mut Rc<RefCell<DELAY>>,
+        mut sd_card: FileStorage<SPI, CS, DELAY>,
+        delay: &mut DELAY,
     ) -> Self {
         // create the motor controller
         let motors = MotorController::new(ina1_pin, ina2_pin, inb1_pin, inb2_pin, ena_pin, enb_pin);
@@ -155,12 +179,12 @@ where
         unsafe {
             pac::NVIC::unmask(pac::Interrupt::IO_IRQ_BANK0);
         }
-        let i2c_shared = Rc::new(RefCell::new(i2c));
 
-        let mut heading_calculator = HeadingCalculator::new(&i2c_shared, delay_shared);
+        let heading_i2c = i2c_manager.acquire_i2c();
+        let mut heading_calculator = HeadingCalculator::new(heading_i2c, delay);
         heading_calculator.reset();
 
-        let mut lcd = LcdBackpack::new(LcdDisplayType::Lcd16x2, &i2c_shared, delay_shared);
+        let mut lcd = LcdBackpack::new(LcdDisplayType::Lcd16x2, i2c_manager.acquire_i2c(), *delay);
         match lcd.init() {
             Ok(_) => {
                 info!("LCD initialized");
@@ -191,21 +215,39 @@ where
             .home()
             .and_then(LcdBackpack::clear)
             .and_then(|lcd| LcdBackpack::print(lcd, "Robot Started"))
+            .and_then(|lcd| {
+                write!(
+                    lcd.set_cursor(0, 1)?,
+                    "SD: {} GB",
+                    sd_card.volume_size().unwrap_or(0) / 1_073_741_824
+                )
+                .map_err(|_e| adafruit_lcd_backpack::Error::FormattingError)
+            })
         {
             error!("Error writing to LCD: {}", error);
         }
 
+        let logger = Logger::new(Logger::<SPI, CS, DELAY, 128>::init_log_file(&mut sd_card));
         // return the robot
         info!("Robot initialized");
         Self {
             motors,
             button1: DebouncedButton::<BUTT1, false, BUTTON_DEBOUNCE_TIME_MS>::new(button1_pin),
             button2: DebouncedButton::<BUTT2, false, BUTTON_DEBOUNCE_TIME_MS>::new(button2_pin),
-            _i2c: i2c_shared,
             heading_calculator,
             lcd,
+            sd_card,
             reset_display_start_millis: millis(), // start the display reset timer to clear the "started" message
+            log_index: 0,
+            logger,
         }
+    }
+
+    /// Inits the Robot software. This function should be called after the robot is created.
+    pub fn init(&mut self) -> Result<(), embedded_sdmmc::Error<embedded_sdmmc::SdCardError>> {
+        writeln!(self.logger, "Robot started")
+            .map_err(|_e| embedded_sdmmc::SdCardError::WriteError)?;
+        Ok(())
     }
 
     /// This function is called in the main loop to allow the robot to handle state updates
@@ -217,6 +259,7 @@ where
             if let Err(error) = core::write!(self.clear_lcd().set_lcd_cursor(0, 0), "Robot Idle") {
                 error!("Error writing to LCD: {}", error.to_string().as_str());
             }
+            self.logger.flush_buffer().ok();
             self.reset_display_start_millis = 0;
         }
         // unset button press if button is not pressed
@@ -436,6 +479,13 @@ where
         ));
         debug!("Completed data table");
         info!("Movement data = {}", data_table);
+        write!(
+            self.logger,
+            "STRAIGHT: distance = {} mm, forward = {}\n{}\n",
+            distance_mm, forward, data_table
+        )
+        .ok();
+        self.logger.flush_buffer().ok();
         self.start_display_reset_timer();
 
         self
@@ -446,7 +496,7 @@ where
     }
 
     pub fn turn(&mut self, angle_degrees: i32) -> &mut Self {
-        const TURN_MIN_POWER: f32 = 0.35;
+        const TURN_MIN_POWER: f32 = 0.50;
         if angle_degrees.abs() < self.min_turn_angle() as i32 {
             debug!("Turn angle {} too small, not turning", angle_degrees);
             return self;
@@ -454,7 +504,15 @@ where
 
         info!("Robot turn, angle = {}", angle_degrees);
         self.reset_wheel_counters();
-        let direction_str = if angle_degrees > 0 {
+        let turn_degrees = if angle_degrees > 180 {
+            angle_degrees - 360
+        } else if angle_degrees < -180 {
+            angle_degrees + 360
+        } else {
+            angle_degrees
+        };
+
+        let direction_str = if turn_degrees > 0 {
             LEFT_ARROW_STRING
         } else {
             RIGHT_ARROW_STRING
@@ -463,7 +521,7 @@ where
             self.clear_lcd().set_lcd_cursor(0, 0),
             "{} 0 / {}\x03",
             direction_str,
-            angle_degrees,
+            turn_degrees,
         ) {
             error!("Error writing to LCD: {}", error.to_string().as_str());
         }
@@ -475,7 +533,7 @@ where
         // motor A is the left motor, motor B is the right motor
         self.motors
             .set_duty(self.noramlize_duty(1.), self.noramlize_duty(1.));
-        if angle_degrees > 0 {
+        if turn_degrees > 0 {
             self.motors.reverse_a();
             self.motors.forward_b();
         } else {
@@ -483,12 +541,12 @@ where
             self.motors.reverse_b();
         }
 
-        while current_angle.abs() < (angle_degrees.abs() - 12) as f32 {
+        while current_angle.abs() < (turn_degrees.abs() - 12) as f32 {
             current_angle = self.heading_calculator.heading();
 
             if (current_angle - last_adjust_angle).abs() > 5.0 {
                 last_adjust_angle = current_angle;
-                let abs_angle = angle_degrees.abs() as f32;
+                let abs_angle = turn_degrees.abs() as f32;
                 let motor_power = TURN_MIN_POWER
                     + (1.0 - TURN_MIN_POWER) * ((abs_angle - current_angle.abs()) / abs_angle);
                 self.motors.set_duty(
@@ -501,7 +559,7 @@ where
                 "{} {} / {}\x03",
                 direction_str,
                 current_angle as i32,
-                angle_degrees,
+                turn_degrees,
             ) {
                 error!("Error writing to LCD: {}", error.to_string().as_str());
             }
@@ -509,22 +567,8 @@ where
         }
         self.motors.stop();
         let start_millis = millis();
-        let mut update_millis = start_millis;
         while millis() - start_millis < 1000 {
             self.handle_loop();
-            if millis() - update_millis > 400 {
-                update_millis = millis();
-                current_angle = self.heading_calculator.heading();
-                if let Err(error) = core::write!(
-                    self.clear_lcd().set_lcd_cursor(0, 0),
-                    "{} {} / {}\x03",
-                    direction_str,
-                    current_angle as i32,
-                    angle_degrees,
-                ) {
-                    error!("Error writing to LCD: {}", error.to_string().as_str());
-                }
-            }
         }
         current_angle = self.heading_calculator.heading();
         if let Err(error) = core::write!(
@@ -532,10 +576,16 @@ where
             "{} {} / {}\x03",
             direction_str,
             current_angle as i32,
-            angle_degrees,
+            turn_degrees,
         ) {
             error!("Error writing to LCD: {}", error.to_string().as_str());
         }
+        writeln!(
+            self.logger,
+            "TURN: target angle = {}, final angle = {}",
+            turn_degrees, current_angle as i32
+        )
+        .ok();
         info!("Done with turn movement");
         self.start_display_reset_timer();
         self
@@ -565,6 +615,7 @@ where
 
 /// Implements the defmt::Format trait for the Robot struct, allowing the Robot object to be printed with defmt
 impl<
+        'a,
         INA1: OutputPin,
         INA2: OutputPin,
         INB1: OutputPin,
@@ -575,12 +626,17 @@ impl<
         BUTT2: InputPin,
         TWI,
         TWI_ERR,
+        SPI: embedded_hal::blocking::spi::Transfer<u8> + embedded_hal::blocking::spi::Write<u8>,
+        CS: OutputPin,
         DELAY,
-    > Format for Robot<INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI, DELAY>
+    > Format
+    for Robot<'a, INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI, TWI_ERR, SPI, CS, DELAY>
 where
     TWI: I2cWrite<Error = TWI_ERR> + WriteRead<Error = TWI_ERR>,
     TWI_ERR: defmt::Format,
-    DELAY: DelayMs<u16> + DelayUs<u16> + DelayMs<u8>,
+    DELAY: DelayMs<u16> + DelayUs<u16> + DelayMs<u8> + DelayUs<u8> + Copy,
+    <SPI as embedded_hal::blocking::spi::Transfer<u8>>::Error: core::fmt::Debug,
+    <SPI as embedded_hal::blocking::spi::Write<u8>>::Error: core::fmt::Debug,
 {
     fn format(&self, f: defmt::Formatter) {
         defmt::write!(
@@ -594,6 +650,7 @@ where
 
 /// Implement the `core::fmt::Write` trait for the robot, allowing us to use the `core::write!` macro
 impl<
+        'a,
         INA1: OutputPin,
         INA2: OutputPin,
         INB1: OutputPin,
@@ -604,12 +661,17 @@ impl<
         BUTT2: InputPin,
         TWI,
         TWI_ERR,
+        SPI: embedded_hal::blocking::spi::Transfer<u8> + embedded_hal::blocking::spi::Write<u8>,
+        CS: OutputPin,
         DELAY,
-    > core::fmt::Write for Robot<INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI, DELAY>
+    > core::fmt::Write
+    for Robot<'a, INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI, TWI_ERR, SPI, CS, DELAY>
 where
     TWI: I2cWrite<Error = TWI_ERR> + WriteRead<Error = TWI_ERR>,
     TWI_ERR: defmt::Format,
-    DELAY: DelayMs<u16> + DelayUs<u16> + DelayMs<u8>,
+    DELAY: DelayMs<u16> + DelayUs<u16> + DelayMs<u8> + DelayUs<u8> + Copy,
+    <SPI as embedded_hal::blocking::spi::Transfer<u8>>::Error: core::fmt::Debug,
+    <SPI as embedded_hal::blocking::spi::Write<u8>>::Error: core::fmt::Debug,
 {
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
         self.lcd.write_str(s)

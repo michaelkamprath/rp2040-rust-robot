@@ -5,15 +5,20 @@ mod model;
 mod robot;
 mod system;
 
-use alloc::rc::Rc;
 use bsp::{
     entry,
     hal::{fugit::HertzU32, gpio},
 };
-use core::cell::RefCell;
-use defmt::{info, panic};
+use defmt::{error, info, panic};
 use defmt_rtt as _;
 use panic_probe as _;
+use rp2040_hal::{
+    gpio::{
+        bank0::{Gpio0, Gpio2, Gpio3, Gpio4, Gpio5},
+        FunctionI2c, FunctionSpi, Pin, PullDown,
+    },
+    pac::{I2C0, SPI0},
+};
 
 // Provide an alias for our BSP so we can switch targets quickly.
 // Uncomment the BSP you included in Cargo.toml, the rest of the code does not need to change.
@@ -51,7 +56,7 @@ fn main() -> ! {
 
     info!("Program start");
     let mut pac = pac::Peripherals::take().unwrap();
-    let core = pac::CorePeripherals::take().unwrap();
+    let _core = pac::CorePeripherals::take().unwrap();
     let mut watchdog = Watchdog::new(pac.WATCHDOG);
     let sio = Sio::new(pac.SIO);
 
@@ -68,11 +73,6 @@ fn main() -> ! {
     )
     .ok()
     .unwrap();
-
-    let mut delay_shared = Rc::new(RefCell::new(cortex_m::delay::Delay::new(
-        core.SYST,
-        clocks.system_clock.freq().to_Hz(),
-    )));
 
     let pins = bsp::Pins::new(
         pac.IO_BANK0,
@@ -109,27 +109,77 @@ fn main() -> ! {
         &mut pac.RESETS,
         clocks.system_clock.freq(),
     );
+    let i2c_manager: &'static _ = shared_bus::new_cortexm!(rp2040_hal::I2C<I2C0, (Pin<Gpio4, FunctionI2c, PullDown>, Pin<Gpio5, FunctionI2c, PullDown>)> = i2c).unwrap();
 
-    let robot = Robot::new(
+    // set up SPI
+    #[allow(clippy::type_complexity)]
+    let spi: rp_pico::hal::Spi<
+        rp_pico::hal::spi::Disabled,
+        SPI0,
+        (
+            rp_pico::hal::gpio::Pin<Gpio3, FunctionSpi, PullDown>,
+            rp_pico::hal::gpio::Pin<Gpio0, FunctionSpi, PullDown>,
+            rp_pico::hal::gpio::Pin<Gpio2, FunctionSpi, PullDown>,
+        ),
+    > = bsp::hal::Spi::new(
+        pac.SPI0,
+        (
+            pins.gpio3.into_function::<gpio::FunctionSpi>(),
+            pins.gpio0.into_function::<gpio::FunctionSpi>(),
+            pins.gpio2.into_function::<gpio::FunctionSpi>(),
+        ),
+    );
+
+    // Exchange the uninitialised SPI driver for an initialised one
+    let spi = spi.init(
+        &mut pac.RESETS,
+        clocks.peripheral_clock.freq(),
+        HertzU32::from_raw(400_000), // card initialization happens at low baud rate
+        embedded_hal::spi::MODE_0,
+    );
+
+    let sd = crate::robot::file_storage::FileStorage::new(
+        spi,
+        pins.gpio1.into_push_pull_output(),
+        timer,
+    );
+
+    // If SD card is successfully initialized, we can increase the SPI speed
+    match sd.spi(|spi| {
+        spi.set_baudrate(
+            clocks.peripheral_clock.freq(),
+            HertzU32::from_raw(20_000_000),
+        )
+    }) {
+        Some(speed) => {
+            info!("SPI speed increased to {}", speed.raw());
+        }
+        None => {
+            error!("Error increasing SPI speed");
+        }
+    }
+
+    let mut robot = Robot::new(
         pins.gpio10.into_push_pull_output(),
         pins.gpio11.into_push_pull_output(),
         pins.gpio13.into_push_pull_output(),
         pins.gpio12.into_push_pull_output(),
         channel_a,
         channel_b,
-        pins.gpio2.into_pull_up_input(),
-        pins.gpio3.into_pull_up_input(),
-        i2c,
+        pins.gpio14.into_pull_up_input(),
+        pins.gpio15.into_pull_up_input(),
+        i2c_manager,
         pins.gpio21.into_pull_up_input(),
         pins.gpio20.into_pull_up_input(),
-        &mut delay_shared,
+        sd,
+        &mut timer,
     );
 
-    let mut driver = Driver::new(
-        robot,
-        delay_shared.clone(),
-        pins.led.into_push_pull_output(),
-    );
+    if let Err(e) = robot.init() {
+        panic!("Error initializing SD card: {:?}", e);
+    }
+
+    let mut driver = Driver::new(robot, timer, pins.led.into_push_pull_output());
 
     info!("robot controller and driver created");
 

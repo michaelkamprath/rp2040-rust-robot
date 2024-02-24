@@ -1,18 +1,20 @@
-#![allow(non_camel_case_types, dead_code)]
-use core::{cell::RefCell, fmt::Write};
+#![allow(non_camel_case_types, dead_code, clippy::type_complexity)]
+use core::fmt::Write;
 
 use crate::{model::point::Point, robot::Robot, system::millis::millis};
-use alloc::rc::Rc;
 use defmt::{debug, warn};
 use embedded_hal::{
-    blocking::delay::{DelayMs, DelayUs},
-    blocking::i2c::{Write as I2cWrite, WriteRead},
+    blocking::{
+        delay::{DelayMs, DelayUs},
+        i2c::{Write as I2cWrite, WriteRead},
+    },
     digital::v2::{InputPin, OutputPin},
     PwmPin,
 };
 use micromath::F32Ext;
 
 pub struct Driver<
+    'a,
     INA1: OutputPin,
     INA2: OutputPin,
     INB1: OutputPin,
@@ -22,15 +24,26 @@ pub struct Driver<
     BUTT1: InputPin,
     BUTT2: InputPin,
     TWI,
+    TWI_ERR,
+    SPI,
+    CS: OutputPin,
     DELAY,
     LED1: OutputPin,
-> {
-    robot: Robot<INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI, DELAY>,
-    delay: Rc<RefCell<DELAY>>,
+> where
+    TWI: I2cWrite<Error = TWI_ERR> + WriteRead<Error = TWI_ERR>,
+    TWI_ERR: defmt::Format,
+    SPI: embedded_hal::blocking::spi::Transfer<u8> + embedded_hal::blocking::spi::Write<u8>,
+    <SPI as embedded_hal::blocking::spi::Transfer<u8>>::Error: core::fmt::Debug,
+    <SPI as embedded_hal::blocking::spi::Write<u8>>::Error: core::fmt::Debug,
+    DELAY: DelayMs<u16> + DelayUs<u16> + DelayMs<u8> + DelayUs<u8> + Copy,
+{
+    robot: Robot<'a, INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI, TWI_ERR, SPI, CS, DELAY>,
+    delay: DELAY,
     led1: LED1,
 }
 
 impl<
+        'a,
         INA1: OutputPin,
         INA2: OutputPin,
         INB1: OutputPin,
@@ -41,17 +54,37 @@ impl<
         BUTT2: InputPin,
         TWI,
         TWI_ERR,
+        SPI,
+        CS: OutputPin,
         DELAY,
         LED1: OutputPin,
-    > Driver<INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI, DELAY, LED1>
+    > Driver<'a, INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI, TWI_ERR, SPI, CS, DELAY, LED1>
 where
     TWI: I2cWrite<Error = TWI_ERR> + WriteRead<Error = TWI_ERR>,
     TWI_ERR: defmt::Format,
-    DELAY: DelayMs<u16> + DelayUs<u16> + DelayMs<u8>,
+    SPI: embedded_hal::blocking::spi::Transfer<u8> + embedded_hal::blocking::spi::Write<u8>,
+    <SPI as embedded_hal::blocking::spi::Transfer<u8>>::Error: core::fmt::Debug,
+    <SPI as embedded_hal::blocking::spi::Write<u8>>::Error: core::fmt::Debug,
+    DELAY: DelayMs<u16> + DelayUs<u16> + DelayMs<u8> + DelayUs<u8> + Copy,
 {
     pub fn new(
-        robot: Robot<INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI, DELAY>,
-        delay: Rc<RefCell<DELAY>>,
+        robot: Robot<
+            'a,
+            INA1,
+            INA2,
+            INB1,
+            INB2,
+            ENA,
+            ENB,
+            BUTT1,
+            BUTT2,
+            TWI,
+            TWI_ERR,
+            SPI,
+            CS,
+            DELAY,
+        >,
+        delay: DELAY,
         led1_pin: LED1,
     ) -> Self {
         Self {
@@ -67,7 +100,7 @@ where
         let start_millis = millis();
         while millis() - start_millis < ms {
             self.robot.handle_loop();
-            self.delay.borrow_mut().delay_us(500);
+            self.delay.delay_us(500_u16);
         }
     }
 
@@ -77,6 +110,12 @@ where
             self.trace_path(&[
                 Point::new(0, 0),
                 Point::new(0, 500),
+                Point::new_with_forward(0, 0, false),
+                Point::new(500, 0),
+                Point::new_with_forward(0, 0, false),
+                Point::new(0, -500),
+                Point::new_with_forward(0, 0, false),
+                Point::new(-500, 0),
                 Point::new_with_forward(0, 0, false),
             ]);
             self.led1.set_low().ok();
@@ -99,6 +138,14 @@ where
             warn!("trace_path: point_sequence too short");
             return;
         }
+        writeln!(
+            self.robot.logger,
+            "TRACE_PATH: starting trace path with {} points at {} ms",
+            point_sequence.len(),
+            millis(),
+        )
+        .ok();
+
         let mut cur_point = point_sequence[0];
         // start with the bearing from the first point to the second point
         let mut cur_bearing: f32 = point_sequence[0].absolute_bearing(&point_sequence[1]);
@@ -108,7 +155,12 @@ where
             let bearing = cur_point.absolute_bearing(next_point);
             let bearing_diff = bearing - cur_bearing;
             debug!("driving to next way point\n  cur_point: {:?}, next_point: {:?}\n  distance: {}, bearing {}, forward: {}", cur_point, next_point, distance, bearing, next_point.forward());
-
+            writeln!(
+                self.robot.logger,
+                "MOVE: from way point {:?} to way point {:?}",
+                cur_point, next_point
+            )
+            .ok();
             // turn to the correct bearing
             if bearing_diff.abs() > self.robot.min_turn_angle() {
                 self.robot.turn(bearing_diff as i32);

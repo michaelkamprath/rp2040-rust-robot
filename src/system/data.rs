@@ -172,3 +172,23 @@ where
         defmt::write!(f, "}}");
     }
 }
+
+impl<'a, T, const M: usize> core::fmt::Display for DataTable<'a, T, M>
+where
+    T: Copy + Default + Format + core::fmt::Display,
+{
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        writeln!(f, "DataTable {{")?;
+        for h in 0..self.header.len() {
+            write!(f, "{}", self.header[h])?;
+            if h < self.header.len() - 1 {
+                write!(f, ",")?;
+            }
+        }
+        writeln!(f)?;
+        for row in self.data.iter() {
+            writeln!(f, "{}", row)?;
+        }
+        write!(f, "}}")
+    }
+}
