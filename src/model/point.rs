@@ -1,5 +1,6 @@
 #![allow(dead_code)]
-use defmt::Format;
+use alloc::vec::Vec;
+use defmt::{error, Format};
 use micromath::F32Ext;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -12,6 +13,42 @@ pub struct Point {
 impl Point {
     pub fn new(x: i32, y: i32) -> Self {
         Point::new_with_forward(x, y, true)
+    }
+
+    pub fn new_from_string(s: &str) -> Option<Self> {
+        let parts: Vec<&str> = s.split(',').collect();
+        if parts.len() != 3 {
+            error!("Failed to parse point from string: {}", s);
+            return None;
+        }
+        let x = match parts[0].parse::<i32>() {
+            Ok(x) => x,
+            Err(_) => {
+                error!("Failed to parse x coordinate from string: {}", s);
+                return None;
+            }
+        };
+        let y = match parts[1].parse::<i32>() {
+            Ok(y) => y,
+            Err(_) => {
+                error!("Failed to parse y coordinate from string: {}", s);
+                return None;
+            }
+        };
+        let forward = match parts[2].to_lowercase().as_str() {
+            "true" => true,
+            "1" => true,
+            "t" => true,
+            "false" => false,
+            "0" => false,
+            "f" => false,
+            _ => {
+                error!("Failed to parse forward from string: {}", s);
+                return None;
+            }
+        };
+
+        Some(Point::new_with_forward(x, y, forward))
     }
 
     pub fn new_with_forward(x: i32, y: i32, forward: bool) -> Self {

@@ -12,10 +12,10 @@ use crate::{
         motor_controller::MotorController,
         telemetry::straight_movement::StraightTelemetryRow,
     },
-    system::{data::DataTable, millis::millis},
+    system::millis::millis,
 };
 use adafruit_lcd_backpack::{LcdBackpack, LcdDisplayType};
-use alloc::string::ToString;
+use alloc::string::{String, ToString};
 use core::{
     self,
     cell::{Cell, RefCell},
@@ -87,7 +87,7 @@ const WHEEL_TICKS_PER_MM: f32 = WHEEL_TICKS_PER_REVOLUTION / WHEEL_CIRCUMFERENCE
 const MM_PER_WHEEL_TICK: f32 = WHEEL_CIRCUMFERENCE / WHEEL_TICKS_PER_REVOLUTION;
 
 const BUTTON_DEBOUNCE_TIME_MS: u32 = 10;
-const CONTROLLER_SAMPLE_PERIOD_MS: u32 = 50;
+const CONTROLLER_SAMPLE_PERIOD_MS: u32 = 25;
 
 pub struct Robot<
     'a,
@@ -116,10 +116,11 @@ pub struct Robot<
     button2: DebouncedButton<BUTT2, false, BUTTON_DEBOUNCE_TIME_MS>,
     pub heading_calculator: HeadingCalculator<shared_bus::I2cProxy<'a, Mutex<RefCell<TWI>>>, DELAY>,
     lcd: LcdBackpack<shared_bus::I2cProxy<'a, Mutex<RefCell<TWI>>>, DELAY>,
-    sd_card: FileStorage<SPI, CS, DELAY>,
+    pub sd_card: FileStorage<SPI, CS, DELAY>,
     reset_display_start_millis: u32,
     log_index: u32,
     pub logger: Logger<SPI, CS, DELAY, 128>,
+    idle_message: Option<String>,
 }
 
 #[allow(dead_code, non_camel_case_types)]
@@ -240,6 +241,7 @@ where
             reset_display_start_millis: millis(), // start the display reset timer to clear the "started" message
             log_index: 0,
             logger,
+            idle_message: None,
         }
     }
 
@@ -259,6 +261,12 @@ where
             if let Err(error) = core::write!(self.clear_lcd().set_lcd_cursor(0, 0), "Robot Idle") {
                 error!("Error writing to LCD: {}", error.to_string().as_str());
             }
+            if self.idle_message.is_some() {
+                let message = self.idle_message.as_ref().unwrap().clone();
+                if let Err(error) = core::write!(self.set_lcd_cursor(0, 1), "{}", message) {
+                    error!("Error writing to LCD: {}", error.to_string().as_str());
+                }
+            }
             self.logger.flush_buffer().ok();
             self.reset_display_start_millis = 0;
         }
@@ -269,6 +277,9 @@ where
         self.heading_calculator.update();
     }
 
+    pub fn set_idle_message(&mut self, message: Option<String>) {
+        self.idle_message = message;
+    }
     pub fn display_text(&mut self, text: &str) {
         self.lcd.clear().ok();
         self.lcd.set_cursor(0, 0).ok();
@@ -326,6 +337,11 @@ where
         self.reset_display_start_millis = millis();
     }
 
+    /// Clears the robot display reset timer
+    pub fn clear_display_reset_timer(&mut self) {
+        self.reset_display_start_millis = 0;
+    }
+
     //--------------------------------------------------------------------------
     // Robot movement functions
     //--------------------------------------------------------------------------
@@ -360,10 +376,14 @@ where
         );
         self.reset_wheel_counters();
 
-        let mut data_table = DataTable::<
-            StraightTelemetryRow,
-            { StraightTelemetryRow::DATA_COLUMNS },
-        >::new(*StraightTelemetryRow::header());
+        writeln!(
+            self.logger,
+            "STRAIGHT: distance = {} mm, forward = {}\nmovement data = {{\n{}",
+            distance_mm,
+            forward,
+            StraightTelemetryRow::header().join(", "),
+        )
+        .ok();
 
         let mut traveled_ticks: u32 = 0;
         let mut last_update_millis = 0;
@@ -377,16 +397,22 @@ where
 
         self.motors
             .set_duty(self.noramlize_duty(1.), self.noramlize_duty(1.));
-        data_table.append(StraightTelemetryRow::new(
-            millis(),
-            0,
-            0,
-            1.0,
-            1.0,
-            self.heading_calculator.heading(),
-            0.,
-        ));
-        let mut update_count: u32 = 0;
+
+        writeln!(
+            self.logger,
+            "{}",
+            StraightTelemetryRow::new(
+                millis(),
+                0,
+                0,
+                1.0,
+                1.0,
+                self.heading_calculator.heading(),
+                0.,
+            ),
+        )
+        .ok();
+
         if forward {
             self.motors.forward();
         } else {
@@ -401,7 +427,6 @@ where
             traveled_ticks = (left_wheel_ticks + right_wheel_ticks) / 2;
             if millis() - last_update_millis > CONTROLLER_SAMPLE_PERIOD_MS {
                 last_update_millis = millis();
-                update_count += 1;
 
                 let heading = self.heading_calculator.heading();
                 let control_signal = controller.update(heading, last_update_millis);
@@ -423,8 +448,11 @@ where
                     self.noramlize_duty(left_power),
                     self.noramlize_duty(right_power),
                 );
-                if update_count % 5 == 0 {
-                    let _ = data_table.append(StraightTelemetryRow::new(
+
+                writeln!(
+                    self.logger,
+                    "{}",
+                    StraightTelemetryRow::new(
                         last_update_millis,
                         left_wheel_ticks,
                         right_wheel_ticks,
@@ -432,8 +460,9 @@ where
                         right_power,
                         heading,
                         control_signal,
-                    ));
-                }
+                    ),
+                )
+                .ok();
 
                 if let Err(error) = core::write!(
                     self.set_lcd_cursor(0, 0),
@@ -468,23 +497,22 @@ where
         }
         self.motors.stop();
         info!("Done with straight movement");
-        data_table.append(StraightTelemetryRow::new(
-            millis(),
-            left_wheel_ticks,
-            right_wheel_ticks,
-            0.,
-            0.,
-            self.heading_calculator.heading(),
-            0.,
-        ));
-        debug!("Completed data table");
-        info!("Movement data = {}", data_table);
-        write!(
+
+        writeln!(
             self.logger,
-            "STRAIGHT: distance = {} mm, forward = {}\n{}\n",
-            distance_mm, forward, data_table
+            "{}\n}}",
+            StraightTelemetryRow::new(
+                millis(),
+                left_wheel_ticks,
+                right_wheel_ticks,
+                0.,
+                0.,
+                self.heading_calculator.heading(),
+                0.,
+            ),
         )
         .ok();
+        debug!("Completed data table");
         self.logger.flush_buffer().ok();
         self.start_display_reset_timer();
 

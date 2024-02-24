@@ -2,7 +2,12 @@
 use core::fmt::Write;
 
 use crate::{model::point::Point, robot::Robot, system::millis::millis};
-use defmt::{debug, warn};
+use alloc::{
+    string::{String, ToString},
+    vec,
+    vec::Vec,
+};
+use defmt::{debug, info, warn};
 use embedded_hal::{
     blocking::{
         delay::{DelayMs, DelayUs},
@@ -12,6 +17,10 @@ use embedded_hal::{
     PwmPin,
 };
 use micromath::F32Ext;
+
+const PATHS_DIR: &str = "paths";
+const PATH_EXTENTION: &str = "PTH";
+const SELECT_PATH_TIMEOUT_MS: u32 = 3500;
 
 pub struct Driver<
     'a,
@@ -40,6 +49,7 @@ pub struct Driver<
     robot: Robot<'a, INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI, TWI_ERR, SPI, CS, DELAY>,
     delay: DELAY,
     led1: LED1,
+    selected_path: Option<String>,
 }
 
 impl<
@@ -91,6 +101,7 @@ where
             robot,
             delay,
             led1: led1_pin,
+            selected_path: None,
         }
     }
 
@@ -107,30 +118,86 @@ where
     pub fn handle_loop(&mut self) {
         if self.robot.button1_pressed() {
             self.led1.set_high().ok();
-            self.trace_path(&[
-                Point::new(0, 0),
-                Point::new(0, 500),
-                Point::new_with_forward(0, 0, false),
-                Point::new(500, 0),
-                Point::new_with_forward(0, 0, false),
-                Point::new(0, -500),
-                Point::new_with_forward(0, 0, false),
-                Point::new(-500, 0),
-                Point::new_with_forward(0, 0, false),
-            ]);
+            debug!("button1 pressed");
+            if self.selected_path.is_some() {
+                let filename = self.selected_path.clone();
+                let path = self.load_path_file(filename.as_ref().unwrap().as_str());
+                if path.is_some() {
+                    info!("loaded path: {}", filename.as_ref().unwrap().as_str());
+                    writeln!(
+                        self.robot.logger,
+                        "\n==========\nLOAD_PATH: loaded path from file {}",
+                        filename.as_ref().unwrap().as_str()
+                    )
+                    .ok();
+                    let points = path.unwrap();
+                    self.trace_path(points.as_slice());
+                }
+            }
             self.led1.set_low().ok();
         }
         if self.robot.button2_pressed() {
             debug!("button2 pressed");
-            write!(
-                self.robot.clear_lcd().set_lcd_cursor(0, 0),
-                "button2 pressed",
-            )
-            .ok();
-            write!(self.robot.set_lcd_cursor(0, 1), "ms: {}", millis()).ok();
-            self.robot.start_display_reset_timer();
+            let result = self.handle_select_path();
+            if result.is_some() {
+                self.selected_path = result;
+                self.robot.set_idle_message(self.selected_path.clone());
+            }
         }
         self.robot.handle_loop();
+    }
+
+    pub fn load_path_file(&mut self, path_filename: &str) -> Option<Vec<Point>> {
+        if self.selected_path.is_none() {
+            warn!("load_and_trace_path: no path selected");
+            return None;
+        }
+        if self.robot.sd_card.root_dir().is_none() {
+            warn!("load_and_trace_path: no sd card present");
+            return None;
+        }
+        let root_dir = self.robot.sd_card.root_dir().unwrap();
+        let paths_dir = self.robot.sd_card.open_dir(root_dir, PATHS_DIR).unwrap();
+        let mut path_file = self
+            .robot
+            .sd_card
+            .open_file_in_dir(path_filename, paths_dir, embedded_sdmmc::Mode::ReadOnly)
+            .unwrap();
+
+        let path_size = path_file.length().ok()?;
+        let mut path_buffer = vec![0; path_size as usize];
+        path_file.read(&mut path_buffer).ok()?;
+        let path_str = match core::str::from_utf8(&path_buffer) {
+            Ok(s) => s,
+            Err(e) => {
+                warn!(
+                    "load_and_trace_path: failed to parse path file contents: {:?}",
+                    e.to_string().as_str()
+                );
+                return None;
+            }
+        };
+        let mut path: Vec<Point> = Vec::new();
+        debug!("Parsing path file contents:\n{}", path_str);
+        for line in path_str.lines() {
+            let trimmed_line = line.trim().to_string();
+            if trimmed_line.starts_with('#') {
+                // skip comment lines
+                continue;
+            }
+            let point: Point = match Point::new_from_string(trimmed_line.as_str()) {
+                Some(p) => p,
+                None => {
+                    warn!(
+                        "load_and_trace_path: failed to parse point from line: {}",
+                        trimmed_line.as_str()
+                    );
+                    continue;
+                }
+            };
+            path.push(point);
+        }
+        Some(path)
     }
 
     pub fn trace_path(&mut self, point_sequence: &[Point]) {
@@ -173,5 +240,74 @@ where
             cur_point = *next_point;
             cur_bearing = bearing;
         }
+    }
+
+    pub fn handle_select_path(&mut self) -> Option<String> {
+        // the second button has been selected while robot was idle.
+        //    1. fetch all *.path from the "path" directory on sd card
+        //    2. display the selection prompt on LCD line 0 and the first path on line 1
+        //    3. when button 2 is pressed, display next path on line 1, circling back to the first path after the last path
+        //    4. when button 1 is pressed, select the current path and make it active. Show short message on LCD line 0 and 1 about select path. let robot return to idle state after idle wait time.
+        //    5. if while in the selct path state no button is pressed for the idle wait time, return to idle state without changing the active path
+
+        // 1. fetch all *.path from the "path" directory on sd card
+        let root_dir = self.robot.sd_card.root_dir().unwrap();
+        let paths = self
+            .robot
+            .sd_card
+            .list_files_in_dir_with_ext(root_dir, PATHS_DIR, PATH_EXTENTION)
+            .unwrap_or_default();
+        if paths.is_empty() {
+            write!(
+                self.robot.clear_lcd().set_lcd_cursor(0, 0),
+                "No paths found",
+            )
+            .ok();
+            self.robot.start_display_reset_timer();
+            return None;
+        }
+
+        // 2. display the selection prompt on LCD line 0 and the first path on line 1
+        self.robot.clear_display_reset_timer();
+        write!(self.robot.clear_lcd().set_lcd_cursor(0, 0), "Select path >",).ok();
+        write!(
+            self.robot.set_lcd_cursor(0, 1),
+            "{}",
+            paths[0].name.to_string().as_str()
+        )
+        .ok();
+        let mut paths_idx: usize = 0;
+
+        let mut last_interaction_millis = millis();
+        while millis() - last_interaction_millis < SELECT_PATH_TIMEOUT_MS {
+            self.robot.handle_loop();
+            if self.robot.button2_pressed() {
+                // 3. when button 2 is pressed, display next path on line 1, circling back to the first path after the last path
+                paths_idx += 1;
+                let next_path_index = paths_idx % paths.len();
+                write!(
+                    self.robot.set_lcd_cursor(0, 1),
+                    "{}",
+                    paths[next_path_index].name.to_string().as_str()
+                )
+                .ok();
+                last_interaction_millis = millis();
+            }
+            if self.robot.button1_pressed() {
+                // 4. when button 1 is pressed, select the current path and make it active. Show short message on LCD line 0 and 1 about select path. let robot return to idle state after idle wait time.
+                let selected_path_index = paths_idx % paths.len();
+                write!(self.robot.clear_lcd().set_lcd_cursor(0, 0), "Path selected",).ok();
+                write!(
+                    self.robot.set_lcd_cursor(0, 1),
+                    "{}",
+                    paths[selected_path_index].name.to_string().as_str()
+                )
+                .ok();
+                self.robot.start_display_reset_timer();
+                return Some(paths[selected_path_index].name.to_string());
+            }
+        }
+        self.robot.start_display_reset_timer();
+        None
     }
 }

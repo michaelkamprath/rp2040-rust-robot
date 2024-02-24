@@ -2,7 +2,7 @@
 pub mod logger;
 pub mod sd_file;
 
-use alloc::rc::Rc;
+use alloc::{rc::Rc, string::ToString, vec::Vec};
 use core::cell::RefCell;
 use defmt::{debug, error, info};
 use embedded_hal::blocking::delay::DelayUs;
@@ -191,6 +191,28 @@ where
             .unwrap()
             .borrow_mut()
             .iterate_dir(dir, func)
+    }
+
+    pub fn list_files_in_dir_with_ext(
+        &self,
+        parent_dir: Directory,
+        target_dir: &str,
+        ext: &str,
+    ) -> Result<Vec<DirEntry>, embedded_sdmmc::Error<SdCardError>> {
+        let mut files: Vec<DirEntry> = Vec::new();
+        let dir = self.open_dir(parent_dir, target_dir).unwrap();
+        self.iterate_dir(dir, |entry| {
+            if entry.name.to_string().ends_with(ext) {
+                debug!("Found path file: {:?}", entry.name.to_string().as_str());
+                files.push(entry.clone());
+            }
+        })?;
+        self.volume_mgr
+            .as_ref()
+            .unwrap()
+            .borrow_mut()
+            .close_dir(dir)?;
+        Ok(files)
     }
 }
 

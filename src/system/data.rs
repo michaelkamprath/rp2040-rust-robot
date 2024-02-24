@@ -20,7 +20,7 @@ where
     pub fn new(header: [&'a str; M]) -> Self {
         Self {
             header,
-            data: Vec::with_capacity(20),
+            data: Vec::with_capacity(30),
         }
     }
 

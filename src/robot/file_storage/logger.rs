@@ -188,6 +188,11 @@ where
     }
 
     pub fn flush_buffer(&mut self) -> Result<(), embedded_sdmmc::Error<SdCardError>> {
+        if self.buffer_index == 0 {
+            // nothing to flush
+            return Ok(());
+        }
+
         if let Some(log_file) = &mut self.log_file {
             if let Err(e) = log_file.write(&self.buffer[..self.buffer_index]) {
                 error!("Error writing to log file: {:?}", e);
