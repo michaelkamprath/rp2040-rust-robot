@@ -52,11 +52,11 @@ where
         let root_dir = match sdcard.root_dir() {
             Some(dir) => dir,
             None => {
-                error!("Error opening root dir");
+                warn!("Could not create log file. No logging will be done.");
                 return None;
             }
         };
-        let log_dir = match sdcard.open_dir(root_dir, LOG_DIR_NAME) {
+        let log_dir = match sdcard.open_directory(root_dir, LOG_DIR_NAME) {
             Some(dir) => dir,
             None => {
                 error!("Error opening log dir");
@@ -109,7 +109,7 @@ where
         };
 
         // write the new log index back to the file. Need to re-open the containing directory first.
-        let log_dir = match sdcard.open_dir(root_dir, LOG_DIR_NAME) {
+        let log_dir = match sdcard.open_directory(root_dir, LOG_DIR_NAME) {
             Some(dir) => dir,
             None => {
                 error!("Error opening log dir");
@@ -140,7 +140,7 @@ where
 
         // now creater the logger
         let log_filename = format!("log_{}.txt", log_index);
-        let log_dir = match sdcard.open_dir(root_dir, LOG_DIR_NAME) {
+        let log_dir = match sdcard.open_directory(root_dir, LOG_DIR_NAME) {
             Some(dir) => dir,
             None => {
                 error!("Error opening log dir");

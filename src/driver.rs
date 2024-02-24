@@ -133,6 +133,10 @@ where
                     let points = path.unwrap();
                     self.trace_path(points.as_slice());
                 }
+            } else {
+                warn!("handle_loop: no path selected");
+                write!(self.robot.set_lcd_cursor(0, 1), "No path loaded!").ok();
+                self.robot.start_display_reset_timer();
             }
             self.led1.set_low().ok();
         }
@@ -141,7 +145,8 @@ where
             let result = self.handle_select_path();
             if result.is_some() {
                 self.selected_path = result;
-                self.robot.set_idle_message(self.selected_path.clone());
+                self.robot
+                    .set_idle_message_line2(self.selected_path.clone());
             }
         }
         self.robot.handle_loop();
@@ -157,7 +162,11 @@ where
             return None;
         }
         let root_dir = self.robot.sd_card.root_dir().unwrap();
-        let paths_dir = self.robot.sd_card.open_dir(root_dir, PATHS_DIR).unwrap();
+        let paths_dir = self
+            .robot
+            .sd_card
+            .open_directory(root_dir, PATHS_DIR)
+            .unwrap();
         let mut path_file = self
             .robot
             .sd_card
@@ -251,6 +260,12 @@ where
         //    5. if while in the selct path state no button is pressed for the idle wait time, return to idle state without changing the active path
 
         // 1. fetch all *.path from the "path" directory on sd card
+        if self.robot.sd_card.root_dir().is_none() {
+            warn!("handle_select_path: no sd card present");
+            write!(self.robot.set_lcd_cursor(0, 1), "No SD Card!").ok();
+            self.robot.start_display_reset_timer();
+            return None;
+        }
         let root_dir = self.robot.sd_card.root_dir().unwrap();
         let paths = self
             .robot
@@ -287,7 +302,7 @@ where
                 let next_path_index = paths_idx % paths.len();
                 write!(
                     self.robot.set_lcd_cursor(0, 1),
-                    "{}",
+                    "{: <16}",
                     paths[next_path_index].name.to_string().as_str()
                 )
                 .ok();

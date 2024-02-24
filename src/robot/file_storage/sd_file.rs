@@ -117,6 +117,6 @@ where
         if let Err(e) = self.volume_manager.borrow_mut().close_dir(self.directory) {
             error!("Error closing directory: {:?}", e);
         }
-        debug!("SDFile dropped");
+        debug!("SDFile '{}' dropped", self.filename.as_str());
     }
 }

@@ -1,4 +1,5 @@
 #![allow(non_camel_case_types, dead_code)]
+mod config;
 mod debouncer;
 pub mod file_storage;
 mod motor_controller;
@@ -7,6 +8,7 @@ mod telemetry;
 use crate::{
     model::{heading::HeadingCalculator, pid_controller::PIDController},
     robot::{
+        config::Config,
         debouncer::DebouncedButton,
         file_storage::{logger::Logger, FileStorage},
         motor_controller::MotorController,
@@ -15,14 +17,17 @@ use crate::{
     system::millis::millis,
 };
 use adafruit_lcd_backpack::{LcdBackpack, LcdDisplayType};
-use alloc::string::{String, ToString};
+use alloc::{
+    string::{String, ToString},
+    vec,
+};
 use core::{
     self,
     cell::{Cell, RefCell},
     fmt::Write,
 };
 use cortex_m::interrupt::Mutex;
-use defmt::{debug, error, info, Format};
+use defmt::{debug, error, info, warn, Format};
 use embedded_hal::{
     blocking::{
         delay::{DelayMs, DelayUs},
@@ -60,6 +65,9 @@ const DEGREES_STRING: &str = "\x03";
 
 const DISPLAY_RESET_DELAY_MS: u32 = 5000;
 
+const CONFIG_DIRECTORY: &str = "config";
+const CONFIG_FILE: &str = "config.ini";
+
 //==============================================================================
 // Interrupt pins and counters for wheel encoders
 //
@@ -78,13 +86,6 @@ static RIGHT_WHEEL_COUNTER: Mutex<Cell<u32>> = Mutex::new(Cell::new(0));
 //==============================================================================
 // Constants for the robot
 //
-const WHEEL_DIAMETER: f32 = 67.0; // mm
-const WHEEL_CIRCUMFERENCE: f32 = WHEEL_DIAMETER * core::f32::consts::PI;
-const MOTOR_REDUCTION_RATIO: f32 = 46.8;
-const ENCODER_TICKS_PER_REVOLUTION: f32 = 12.0;
-const WHEEL_TICKS_PER_REVOLUTION: f32 = ENCODER_TICKS_PER_REVOLUTION * MOTOR_REDUCTION_RATIO;
-const WHEEL_TICKS_PER_MM: f32 = WHEEL_TICKS_PER_REVOLUTION / WHEEL_CIRCUMFERENCE;
-const MM_PER_WHEEL_TICK: f32 = WHEEL_CIRCUMFERENCE / WHEEL_TICKS_PER_REVOLUTION;
 
 const BUTTON_DEBOUNCE_TIME_MS: u32 = 10;
 const CONTROLLER_SAMPLE_PERIOD_MS: u32 = 25;
@@ -120,7 +121,8 @@ pub struct Robot<
     reset_display_start_millis: u32,
     log_index: u32,
     pub logger: Logger<SPI, CS, DELAY, 128>,
-    idle_message: Option<String>,
+    idle_message_line2: Option<String>,
+    config: Config,
 }
 
 #[allow(dead_code, non_camel_case_types)]
@@ -229,8 +231,6 @@ where
         }
 
         let logger = Logger::new(Logger::<SPI, CS, DELAY, 128>::init_log_file(&mut sd_card));
-        // return the robot
-        info!("Robot initialized");
         Self {
             motors,
             button1: DebouncedButton::<BUTT1, false, BUTTON_DEBOUNCE_TIME_MS>::new(button1_pin),
@@ -241,14 +241,47 @@ where
             reset_display_start_millis: millis(), // start the display reset timer to clear the "started" message
             log_index: 0,
             logger,
-            idle_message: None,
+            idle_message_line2: None,
+            config: Config::new(),
         }
     }
 
     /// Inits the Robot software. This function should be called after the robot is created.
     pub fn init(&mut self) -> Result<(), embedded_sdmmc::Error<embedded_sdmmc::SdCardError>> {
+        // load configuration from the SD card
+        if self.sd_card.root_dir().is_some() {
+            let root_dir = self.sd_card.root_dir().unwrap();
+            let config_dir = match self.sd_card.open_directory(root_dir, CONFIG_DIRECTORY) {
+                Some(d) => d,
+                None => {
+                    error!("Error opening config directory");
+                    return Err(embedded_sdmmc::Error::FileNotFound);
+                }
+            };
+            if let Ok(mut config_file) = self.sd_card.open_file_in_dir(
+                CONFIG_FILE,
+                config_dir,
+                embedded_sdmmc::Mode::ReadOnly,
+            ) {
+                let config_length = config_file.length()?;
+                let mut config_buffer = vec![0u8; config_length as usize];
+                let bytes_read = config_file.read(&mut config_buffer)?;
+                let config_str =
+                    core::str::from_utf8(&config_buffer[0..bytes_read]).map_err(|e| {
+                        error!("Error reading config file: {}", e.to_string().as_str());
+                        embedded_sdmmc::Error::FormatError("Error reading config file")
+                    })?;
+                debug!("Config file contents:\n{}", config_str);
+                self.config.set_config_values(config_str);
+            } else {
+                debug!("Config file not found, using defaults");
+            }
+        } else {
+            warn!("Could not load configuration. Using defaults.");
+        }
         writeln!(self.logger, "Robot started")
             .map_err(|_e| embedded_sdmmc::SdCardError::WriteError)?;
+        info!("Robot initialized");
         Ok(())
     }
 
@@ -258,11 +291,14 @@ where
             && millis() - self.reset_display_start_millis > DISPLAY_RESET_DELAY_MS
         {
             debug!("Resetting LCD to idle message");
-            if let Err(error) = core::write!(self.clear_lcd().set_lcd_cursor(0, 0), "Robot Idle") {
+            let idle_message = self.config.idle_message.clone();
+            if let Err(error) =
+                core::write!(self.clear_lcd().set_lcd_cursor(0, 0), "{}", idle_message)
+            {
                 error!("Error writing to LCD: {}", error.to_string().as_str());
             }
-            if self.idle_message.is_some() {
-                let message = self.idle_message.as_ref().unwrap().clone();
+            if self.idle_message_line2.is_some() {
+                let message = self.idle_message_line2.as_ref().unwrap().clone();
                 if let Err(error) = core::write!(self.set_lcd_cursor(0, 1), "{}", message) {
                     error!("Error writing to LCD: {}", error.to_string().as_str());
                 }
@@ -277,8 +313,8 @@ where
         self.heading_calculator.update();
     }
 
-    pub fn set_idle_message(&mut self, message: Option<String>) {
-        self.idle_message = message;
+    pub fn set_idle_message_line2(&mut self, message: Option<String>) {
+        self.idle_message_line2 = message;
     }
     pub fn display_text(&mut self, text: &str) {
         self.lcd.clear().ok();
@@ -347,8 +383,10 @@ where
     //--------------------------------------------------------------------------
 
     pub fn forward(&mut self, duty: f32) -> &mut Self {
-        let normalized_duty = self.noramlize_duty(duty);
-        self.motors.set_duty(normalized_duty, normalized_duty);
+        let left_normalized_duty = self.noramlize_duty(duty * self.config.straight_left_power);
+        let right_normalized_duty = self.noramlize_duty(duty * self.config.straight_right_power);
+        self.motors
+            .set_duty(left_normalized_duty, right_normalized_duty);
         self.motors.forward();
         self
     }
@@ -369,7 +407,7 @@ where
             error!("Error writing to LCD: {}", error.to_string().as_str());
         }
 
-        let expected_ticks = (distance_mm as f32 * WHEEL_TICKS_PER_MM) as u32;
+        let expected_ticks = (distance_mm as f32 * self.config.wheel_ticks_per_mm) as u32;
         info!(
             "Robot move straight, distance = {}, target ticks = {}",
             distance_mm, expected_ticks
@@ -390,13 +428,19 @@ where
         let mut left_wheel_ticks = 0;
         let mut right_wheel_ticks = 0;
 
-        let mut controller = PIDController::new(0.5, 0., 0.);
+        let mut controller = PIDController::new(
+            self.config.straight_pid_p,
+            self.config.straight_pid_i,
+            self.config.straight_pid_d,
+        );
         // we want to go straight, so the setpoint is 0
         controller.set_setpoint(0.);
         self.heading_calculator.reset();
 
-        self.motors
-            .set_duty(self.noramlize_duty(1.), self.noramlize_duty(1.));
+        self.motors.set_duty(
+            self.noramlize_duty(self.config.straight_left_power),
+            self.noramlize_duty(self.config.straight_right_power),
+        );
 
         writeln!(
             self.logger,
@@ -433,15 +477,13 @@ where
 
                 let mut cs_indicator: &str = direction_arrow;
                 // positive control signal means turn left, a negative control signal means turn right
-                let mut left_power: f32 = 1.;
-                let mut right_power: f32 = 1.;
+                let mut left_power: f32 = self.config.straight_left_power;
+                let mut right_power: f32 = self.config.straight_right_power;
                 if (forward && control_signal > 0.) || (!forward && control_signal < 0.) {
-                    left_power = 1. - control_signal;
-                    right_power = 1.0;
+                    left_power -= control_signal;
                     cs_indicator = LEFT_ARROW_STRING;
                 } else if (forward && control_signal < 0.) || (!forward && control_signal > 0.) {
-                    left_power = 1.0;
-                    right_power = 1. + control_signal;
+                    right_power += control_signal;
                     cs_indicator = RIGHT_ARROW_STRING;
                 }
                 self.motors.set_duty(
@@ -464,11 +506,12 @@ where
                 )
                 .ok();
 
+                let wheel_ticks_per_mm = self.config.wheel_ticks_per_mm;
                 if let Err(error) = core::write!(
                     self.set_lcd_cursor(0, 0),
                     "{} {} / {} mm",
                     direction_arrow,
-                    (traveled_ticks as f32 * MM_PER_WHEEL_TICK) as i32,
+                    (traveled_ticks as f32 / wheel_ticks_per_mm) as i32,
                     distance_mm,
                 ) {
                     error!("Error writing to LCD: {}", error.to_string().as_str());
@@ -512,7 +555,6 @@ where
             ),
         )
         .ok();
-        debug!("Completed data table");
         self.logger.flush_buffer().ok();
         self.start_display_reset_timer();
 
@@ -559,38 +601,41 @@ where
 
         // start the motors per right hand rule (postive angle = left turn, negative angle = right turn)
         // motor A is the left motor, motor B is the right motor
-        self.motors
-            .set_duty(self.noramlize_duty(1.), self.noramlize_duty(1.));
+        #[allow(unused_assignments)]
+        let mut stop_angle_delta: i32 = 0;
         if turn_degrees > 0 {
+            self.motors.set_duty(
+                self.noramlize_duty(self.config.turn_left_left_power),
+                self.noramlize_duty(self.config.turn_left_right_power),
+            );
             self.motors.reverse_a();
             self.motors.forward_b();
+            stop_angle_delta = self.config.turn_left_stop_angle_delta;
         } else {
+            self.motors.set_duty(
+                self.noramlize_duty(self.config.turn_right_left_power),
+                self.noramlize_duty(self.config.turn_right_right_power),
+            );
             self.motors.forward_a();
             self.motors.reverse_b();
-        }
+            stop_angle_delta = self.config.turn_right_stop_angle_delta;
+        };
 
-        while current_angle.abs() < (turn_degrees.abs() - 12) as f32 {
+        while current_angle.abs() < (turn_degrees.abs() + stop_angle_delta) as f32 {
             current_angle = self.heading_calculator.heading();
-
-            if (current_angle - last_adjust_angle).abs() > 5.0 {
+            if (current_angle - last_adjust_angle).abs() > 10.0 {
                 last_adjust_angle = current_angle;
-                let abs_angle = turn_degrees.abs() as f32;
-                let motor_power = TURN_MIN_POWER
-                    + (1.0 - TURN_MIN_POWER) * ((abs_angle - current_angle.abs()) / abs_angle);
-                self.motors.set_duty(
-                    self.noramlize_duty(motor_power),
-                    self.noramlize_duty(motor_power),
-                );
+                if let Err(error) = core::write!(
+                    self.clear_lcd().set_lcd_cursor(0, 0),
+                    "{} {} / {}\x03",
+                    direction_str,
+                    current_angle as i32,
+                    turn_degrees,
+                ) {
+                    error!("Error writing to LCD: {}", error.to_string().as_str());
+                }
             }
-            if let Err(error) = core::write!(
-                self.clear_lcd().set_lcd_cursor(0, 0),
-                "{} {} / {}\x03",
-                direction_str,
-                current_angle as i32,
-                turn_degrees,
-            ) {
-                error!("Error writing to LCD: {}", error.to_string().as_str());
-            }
+
             self.handle_loop();
         }
         self.motors.stop();

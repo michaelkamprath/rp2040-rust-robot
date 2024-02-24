@@ -135,7 +135,7 @@ where
         self.root_dir
     }
 
-    pub fn open_dir(&self, parent: Directory, name: &str) -> Option<Directory> {
+    pub fn open_directory(&self, parent: Directory, name: &str) -> Option<Directory> {
         match self
             .volume_mgr
             .as_ref()?
@@ -200,7 +200,7 @@ where
         ext: &str,
     ) -> Result<Vec<DirEntry>, embedded_sdmmc::Error<SdCardError>> {
         let mut files: Vec<DirEntry> = Vec::new();
-        let dir = self.open_dir(parent_dir, target_dir).unwrap();
+        let dir = self.open_directory(parent_dir, target_dir).unwrap();
         self.iterate_dir(dir, |entry| {
             if entry.name.to_string().ends_with(ext) {
                 debug!("Found path file: {:?}", entry.name.to_string().as_str());
