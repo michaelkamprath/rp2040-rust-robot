@@ -26,6 +26,7 @@ mpu6050 = { git = "https://github.com/michaelkamprath/mpu6050.git", branch = "mi
 ] }
 embedded-alloc = "0.5"
 adafruit-lcd-backpack = { version = "0.1", features = ["defmt"] }
+ini_core = "0.2"
 
 # We're using a Pico by default on this template
 rp-pico = "0.8"
