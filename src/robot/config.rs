@@ -4,11 +4,7 @@ use ini_core as ini;
 
 const WHEEL_DIAMETER: f32 = 67.0; // mm
 const WHEEL_CIRCUMFERENCE: f32 = WHEEL_DIAMETER * core::f32::consts::PI;
-const MOTOR_REDUCTION_RATIO: f32 = 46.8;
-const ENCODER_TICKS_PER_REVOLUTION: f32 = 12.0;
-const WHEEL_TICKS_PER_REVOLUTION: f32 = ENCODER_TICKS_PER_REVOLUTION * MOTOR_REDUCTION_RATIO;
-const WHEEL_TICKS_PER_MM: f32 = WHEEL_TICKS_PER_REVOLUTION / WHEEL_CIRCUMFERENCE;
-const MM_PER_WHEEL_TICK: f32 = WHEEL_CIRCUMFERENCE / WHEEL_TICKS_PER_REVOLUTION;
+const WHEEL_TICKS_PER_MM: f32 = 3.0;
 
 const STRAIGHT_LEFT_MOTOR_POWER: f32 = 1.0;
 const STRAIGHT_RIGHT_MOTOR_POWER: f32 = 1.0;
@@ -49,8 +45,8 @@ impl Config {
             turn_left_right_power: 1.0,
             turn_right_left_power: 1.0,
             turn_right_right_power: 1.0,
-            turn_left_stop_angle_delta: -12,
-            turn_right_stop_angle_delta: -12,
+            turn_left_stop_angle_delta: 0,
+            turn_right_stop_angle_delta: 0,
             wheel_ticks_per_mm: WHEEL_TICKS_PER_MM,
             idle_message: String::from(DEFAULT_IDLE_MESSAGE),
         }
