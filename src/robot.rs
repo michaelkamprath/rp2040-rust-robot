@@ -279,9 +279,9 @@ where
         } else {
             warn!("Could not load configuration. Using defaults.");
         }
-        writeln!(self.logger, "Robot started")
+        writeln!(self.logger, "Robot started\n{}\n", self.config)
             .map_err(|_e| embedded_sdmmc::SdCardError::WriteError)?;
-        info!("Robot initialized");
+        info!("Robot initialized\n{}\n", self.config);
         Ok(())
     }
 

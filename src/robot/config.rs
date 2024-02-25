@@ -187,3 +187,23 @@ impl Config {
         }
     }
 }
+
+impl defmt::Format for Config {
+    fn format(&self, f: defmt::Formatter<'_>) {
+        defmt::write!(
+            f,
+            "Config {{\n  straight_left_power = {},\n  straight_right_power = {},\n  straight_pid_p = {},\n  straight_pid_i = {},\n  straight_pid_d = {},\n  turn_left_left_power = {},\n  turn_left_right_power = {},\n  turn_right_left_power = {},\n  turn_right_right_power = {},\n  turn_left_stop_angle_delta = {},\n  turn_right_stop_angle_delta = {},\n  wheel_ticks_per_mm = {},\n  idle_message = {}\n}}",
+            self.straight_left_power, self.straight_right_power, self.straight_pid_p, self.straight_pid_i, self.straight_pid_d, self.turn_left_left_power, self.turn_left_right_power, self.turn_right_left_power, self.turn_right_right_power, self.turn_left_stop_angle_delta, self.turn_right_stop_angle_delta, self.wheel_ticks_per_mm, self.idle_message.as_str()
+        );
+    }
+}
+
+impl core::fmt::Display for Config {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(
+            f,
+            "Config {{\n  straight_left_power = {},\n  straight_right_power = {},\n  straight_pid_p = {},\n  straight_pid_i = {},\n  straight_pid_d = {},\n  turn_left_left_power = {},\n  turn_left_right_power = {},\n  turn_right_left_power = {},\n  turn_right_right_power = {},\n  turn_left_stop_angle_delta = {},\n  turn_right_stop_angle_delta = {},\n  wheel_ticks_per_mm = {},\n  idle_message = {}\n}}",
+            self.straight_left_power, self.straight_right_power, self.straight_pid_p, self.straight_pid_i, self.straight_pid_d, self.turn_left_left_power, self.turn_left_right_power, self.turn_right_left_power, self.turn_right_right_power, self.turn_left_stop_angle_delta, self.turn_right_stop_angle_delta, self.wheel_ticks_per_mm, self.idle_message.as_str()
+        )
+    }
+}
