@@ -381,16 +381,6 @@ where
     //--------------------------------------------------------------------------
     // Robot movement functions
     //--------------------------------------------------------------------------
-
-    pub fn forward(&mut self, duty: f32) -> &mut Self {
-        let left_normalized_duty = self.noramlize_duty(duty * self.config.straight_left_power);
-        let right_normalized_duty = self.noramlize_duty(duty * self.config.straight_right_power);
-        self.motors
-            .set_duty(left_normalized_duty, right_normalized_duty);
-        self.motors.forward();
-        self
-    }
-
     pub fn straight(&mut self, distance_mm: u32, forward: bool) -> &mut Self {
         let direction_arrow = if forward {
             UP_ARROW_STRING
@@ -416,9 +406,10 @@ where
 
         writeln!(
             self.logger,
-            "STRAIGHT: distance = {} mm, forward = {}\nmovement data = {{\n{}",
+            "STRAIGHT: distance = {} mm, forward = {}\ntarget ticks = {}\nmovement data = {{\n{}",
             distance_mm,
             forward,
+            expected_ticks,
             StraightTelemetryRow::header().join(", "),
         )
         .ok();
@@ -505,6 +496,7 @@ where
                     ),
                 )
                 .ok();
+                self.heading_calculator.update();
 
                 let wheel_ticks_per_mm = self.config.wheel_ticks_per_mm;
                 if let Err(error) = core::write!(
@@ -516,6 +508,7 @@ where
                 ) {
                     error!("Error writing to LCD: {}", error.to_string().as_str());
                 }
+                self.heading_calculator.update();
                 if let Err(error) = core::write!(
                     self.set_lcd_cursor(0, 1),
                     "{} : cs={:.3}",
@@ -638,6 +631,7 @@ where
 
             self.handle_loop();
         }
+        let motors_off_heading = self.heading_calculator.heading();
         self.motors.stop();
         let start_millis = millis();
         while millis() - start_millis < 1000 {
@@ -655,8 +649,8 @@ where
         }
         writeln!(
             self.logger,
-            "TURN: target angle = {}, final angle = {}",
-            turn_degrees, current_angle as i32
+            "TURN: target angle = {}, motors off angle = {}, final angle = {}",
+            turn_degrees, motors_off_heading as i32, current_angle as i32
         )
         .ok();
         info!("Done with turn movement");
