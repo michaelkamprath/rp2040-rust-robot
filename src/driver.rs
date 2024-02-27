@@ -142,12 +142,7 @@ where
         }
         if self.robot.button2_pressed() {
             debug!("button2 pressed");
-            let result = self.handle_select_path();
-            if result.is_some() {
-                self.selected_path = result;
-                self.robot
-                    .set_idle_message_line2(self.selected_path.clone());
-            }
+            self.handle_functions_menu();
         }
         self.robot.handle_loop();
     }
@@ -250,9 +245,73 @@ where
             cur_bearing = bearing;
         }
     }
-
-    pub fn handle_select_path(&mut self) -> Option<String> {
+    pub fn handle_functions_menu(&mut self) {
         // the second button has been selected while robot was idle.
+        // display the functions menu on the LCD and wait for a button press to select a function
+        // - button two will cycle through the functions
+        // - button one will select the current function and execute it
+        // - if no button is pressed for the idle wait time, return to idle state
+
+        const FUNCTIONS: [&str; 2] = ["Select Path", "Calibrate Gyro"];
+        let mut function_idx: usize = 0;
+        let mut last_interaction_millis = millis();
+        self.robot.clear_display_reset_timer();
+        write!(
+            self.robot.clear_lcd().set_lcd_cursor(0, 0),
+            "Select function >"
+        )
+        .ok();
+        write!(
+            self.robot.set_lcd_cursor(0, 1),
+            "{: <16}",
+            FUNCTIONS[function_idx]
+        )
+        .ok();
+
+        while millis() - last_interaction_millis < SELECT_PATH_TIMEOUT_MS {
+            self.robot.handle_loop();
+            if self.robot.button2_pressed() {
+                function_idx += 1;
+                function_idx %= FUNCTIONS.len();
+                write!(
+                    self.robot.set_lcd_cursor(0, 1),
+                    "{: <16}",
+                    FUNCTIONS[function_idx]
+                )
+                .ok();
+                last_interaction_millis = millis();
+            }
+            if self.robot.button1_pressed() {
+                match function_idx {
+                    0 => {
+                        let result = self.handle_function_select_path();
+                        if result.is_some() {
+                            self.selected_path = result;
+                            self.robot
+                                .set_idle_message_line2(self.selected_path.clone());
+                        }
+                    }
+                    1 => {
+                        write!(
+                            self.robot.clear_lcd().set_lcd_cursor(0, 0),
+                            "Calibrating gyro",
+                        )
+                        .ok();
+                        self.robot.calibrate_gyro(&mut self.delay);
+                        write!(self.robot.set_lcd_cursor(0, 1), "      Done      ",).ok();
+                    }
+                    _ => {
+                        warn!("handle_functions_menu: invalid function index");
+                    }
+                }
+                self.robot.start_display_reset_timer();
+                return;
+            }
+        }
+        self.robot.set_display_to_idle();
+    }
+
+    pub fn handle_function_select_path(&mut self) -> Option<String> {
         //    1. fetch all *.path from the "path" directory on sd card
         //    2. display the selection prompt on LCD line 0 and the first path on line 1
         //    3. when button 2 is pressed, display next path on line 1, circling back to the first path after the last path
@@ -322,7 +381,7 @@ where
                 return Some(paths[selected_path_index].name.to_string());
             }
         }
-        self.robot.start_display_reset_timer();
+        self.robot.set_display_to_idle();
         None
     }
 }

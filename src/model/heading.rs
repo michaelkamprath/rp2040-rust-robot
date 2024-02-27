@@ -52,11 +52,7 @@ where
             Ok(offsets) => offsets,
             Err(error) => {
                 error!("Error getting gyro offsets: {}", error);
-                Vector3d::<f32> {
-                    x: 0.0,
-                    y: 0.0,
-                    z: 0.0,
-                }
+                Vector3d::<i32>::default()
             }
         };
 
@@ -65,16 +61,18 @@ where
             cur_offsets.x, cur_offsets.y, cur_offsets.z
         );
 
-        if let Err(error) = gyro.set_gyro_offsets(98, 44, 16) {
-            error!("Error setting gyro offsets: {}", error);
-        }
-
         Self {
             heading: 0.0,
             gyro,
             last_update_rate: 0.0,
             last_update_millis: millis(),
             _delay: PhantomData,
+        }
+    }
+
+    pub fn calibrate<F: FnMut(usize)>(&mut self, delay: &mut DELAY, callback: F) {
+        if let Err(e) = self.gyro.calibrate_gyro(delay, callback) {
+            error!("Error calibrating gyro: {}", e);
         }
     }
 

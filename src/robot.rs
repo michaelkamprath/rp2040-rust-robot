@@ -183,10 +183,6 @@ where
             pac::NVIC::unmask(pac::Interrupt::IO_IRQ_BANK0);
         }
 
-        let heading_i2c = i2c_manager.acquire_i2c();
-        let mut heading_calculator = HeadingCalculator::new(heading_i2c, delay);
-        heading_calculator.reset();
-
         let mut lcd = LcdBackpack::new(LcdDisplayType::Lcd16x2, i2c_manager.acquire_i2c(), *delay);
         match lcd.init() {
             Ok(_) => {
@@ -213,6 +209,18 @@ where
         {
             error!("Error creating degrees character: {}", error);
         };
+
+        if let Err(error) = lcd
+            .home()
+            .and_then(LcdBackpack::clear)
+            .and_then(|lcd| LcdBackpack::print(lcd, "Calibrating Gyro"))
+        {
+            error!("Error writing to LCD: {}", error);
+        }
+
+        let heading_i2c = i2c_manager.acquire_i2c();
+        let mut heading_calculator = HeadingCalculator::new(heading_i2c, delay);
+        heading_calculator.reset();
 
         if let Err(error) = lcd
             .home()
@@ -283,6 +291,14 @@ where
             .map_err(|_e| embedded_sdmmc::SdCardError::WriteError)?;
         info!("Robot initialized\n{}\n", self.config);
         Ok(())
+    }
+
+    pub fn calibrate_gyro(&mut self, delay: &mut DELAY) {
+        self.heading_calculator.calibrate(delay, |step| {
+            if let Ok(lcd) = self.lcd.set_cursor(0, 1) {
+                write!(lcd, "iteration: {}", step).ok();
+            }
+        });
     }
 
     /// This function is called in the main loop to allow the robot to handle state updates
@@ -371,6 +387,11 @@ where
     /// Starts the robot display reset timer
     pub fn start_display_reset_timer(&mut self) {
         self.reset_display_start_millis = millis();
+    }
+
+    /// Sets the robot display to the idle message
+    pub fn set_display_to_idle(&mut self) {
+        self.reset_display_start_millis = 1;
     }
 
     /// Clears the robot display reset timer

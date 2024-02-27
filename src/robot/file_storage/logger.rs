@@ -168,6 +168,8 @@ where
         Some(log_file)
     }
 
+    /// Writes the passed string to the end of the file. All writes are buffered until the buffer
+    /// is full or specifically flushed.
     pub fn write_to_buffer(&mut self, s: &str) -> Result<(), embedded_sdmmc::Error<SdCardError>> {
         let bytes = s.as_bytes();
         let mut idx: usize = 0;
@@ -187,6 +189,7 @@ where
         Ok(())
     }
 
+    /// Flushes the buffer to the file
     pub fn flush_buffer(&mut self) -> Result<(), embedded_sdmmc::Error<SdCardError>> {
         if self.buffer_index == 0 {
             // nothing to flush
