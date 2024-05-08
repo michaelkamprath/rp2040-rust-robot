@@ -685,6 +685,36 @@ where
     }
 
     //--------------------------------------------------------------------------
+    // Test functions
+    //--------------------------------------------------------------------------
+    pub fn display_heading(&mut self) -> Result<(), adafruit_lcd_backpack::Error<TWI_ERR>> {
+        write!(self.lcd.clear()?.set_cursor(0, 0)?, "Heading:").ok();
+        self.heading_calculator.reset();
+        let mut continue_loop = true;
+
+        let mut last_update_millis = 0;
+        while continue_loop {
+            self.handle_loop();
+            if self.button1_pressed() || self.button2_pressed() {
+                continue_loop = false;
+            }
+            if millis() - last_update_millis > 500 {
+                let heading = self.heading_calculator.heading();
+                if let Err(error) = core::write!(
+                    self.lcd.set_cursor(0, 1)?,
+                    "{:.2}{: <16}",
+                    heading,
+                    DEGREES_STRING
+                ) {
+                    error!("Error writing to LCD: {}", error.to_string().as_str());
+                }
+                last_update_millis = millis();
+            }
+        }
+
+        Ok(())
+    }
+    //--------------------------------------------------------------------------
     // LCD functions
     //--------------------------------------------------------------------------
 

@@ -252,7 +252,7 @@ where
         // - button one will select the current function and execute it
         // - if no button is pressed for the idle wait time, return to idle state
 
-        const FUNCTIONS: [&str; 2] = ["Select Path", "Calibrate Gyro"];
+        const FUNCTIONS: [&str; 3] = ["Select Path", "Calibrate Gyro", "Heading Display"];
         let mut function_idx: usize = 0;
         let mut last_interaction_millis = millis();
         self.robot.clear_display_reset_timer();
@@ -290,6 +290,7 @@ where
                             self.robot
                                 .set_idle_message_line2(self.selected_path.clone());
                         }
+                        self.robot.start_display_reset_timer();
                     }
                     1 => {
                         write!(
@@ -299,12 +300,16 @@ where
                         .ok();
                         self.robot.calibrate_gyro(&mut self.delay);
                         write!(self.robot.set_lcd_cursor(0, 1), "      Done      ",).ok();
+                        self.robot.start_display_reset_timer();
+                    }
+                    2 => {
+                        self.robot.display_heading().ok();
+                        self.robot.set_display_to_idle();
                     }
                     _ => {
                         warn!("handle_functions_menu: invalid function index");
                     }
                 }
-                self.robot.start_display_reset_timer();
                 return;
             }
         }
