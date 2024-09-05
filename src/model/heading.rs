@@ -4,10 +4,7 @@ use crate::system::millis::millis;
 use core::marker::PhantomData;
 
 use defmt::{error, info};
-use embedded_hal::blocking::{
-    delay::DelayMs,
-    i2c::{Write, WriteRead},
-};
+use embedded_hal::{delay::DelayNs, i2c::I2c};
 use micromath::vector::Vector3d;
 use mpu6050::Mpu6050;
 
@@ -28,11 +25,10 @@ pub struct HeadingCalculator<TWI, DELAY> {
 }
 
 #[allow(dead_code, non_camel_case_types)]
-impl<TWI, TWI_ERR, DELAY> HeadingCalculator<TWI, DELAY>
+impl<TWI, DELAY> HeadingCalculator<TWI, DELAY>
 where
-    TWI: Write<Error = TWI_ERR> + WriteRead<Error = TWI_ERR>,
-    DELAY: DelayMs<u8>,
-    TWI_ERR: defmt::Format,
+    TWI: I2c,
+    DELAY: DelayNs,
 {
     pub fn new(i2c: TWI, delay: &mut DELAY) -> Self {
         let mut gyro = Mpu6050::new(i2c);
@@ -40,8 +36,8 @@ where
             Ok(_) => {
                 info!("Gyro initialized");
             }
-            Err(e) => {
-                error!("Error initializing gyro: {}", e);
+            Err(_e) => {
+                error!("Error initializing gyro");
             }
         };
         if let Err(_error) = gyro.set_gyro_range(mpu6050::device::GyroRange::D250) {
@@ -50,8 +46,8 @@ where
 
         let cur_offsets = match gyro.get_gyro_offsets() {
             Ok(offsets) => offsets,
-            Err(error) => {
-                error!("Error getting gyro offsets: {}", error);
+            Err(_error) => {
+                error!("Error getting gyro offsets");
                 Vector3d::<i32>::default()
             }
         };
@@ -71,8 +67,8 @@ where
     }
 
     pub fn calibrate<F: FnMut(usize)>(&mut self, delay: &mut DELAY, callback: F) {
-        if let Err(e) = self.gyro.calibrate_gyro(delay, callback) {
-            error!("Error calibrating gyro: {}", e);
+        if let Err(_e) = self.gyro.calibrate_gyro(delay, callback) {
+            error!("Error calibrating gyro");
         }
     }
 
@@ -100,8 +96,8 @@ where
                         self.heading += 360.0;
                     }
                 }
-                Err(error) => {
-                    error!("Error reading gyro: {}", error);
+                Err(_error) => {
+                    error!("Error reading gyro");
                 }
             }
         }

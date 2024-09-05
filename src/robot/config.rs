@@ -6,8 +6,8 @@ const WHEEL_DIAMETER: f32 = 67.0; // mm
 const WHEEL_CIRCUMFERENCE: f32 = WHEEL_DIAMETER * core::f32::consts::PI;
 const WHEEL_TICKS_PER_MM: f32 = 3.0;
 
-const STRAIGHT_LEFT_MOTOR_POWER: f32 = 1.0;
-const STRAIGHT_RIGHT_MOTOR_POWER: f32 = 1.0;
+const STRAIGHT_LEFT_MOTOR_POWER: u8 = 100;
+const STRAIGHT_RIGHT_MOTOR_POWER: u8 = 100;
 const STRAIGHT_PID_P: f32 = 0.5;
 const STRAIGHT_PID_I: f32 = 0.0;
 const STRAIGHT_PID_D: f32 = 0.0;
@@ -16,16 +16,22 @@ const DEFAULT_IDLE_MESSAGE: &str = "Robot Idle";
 
 pub struct Config {
     // straight configuration
-    pub straight_left_power: f32,
-    pub straight_right_power: f32,
+    /// Motor power for left straight movement in integer percent (max 100)
+    pub straight_left_power: u8,
+    /// Motor power for right straight movement in integer percent (max 100)
+    pub straight_right_power: u8,
     pub straight_pid_p: f32,
     pub straight_pid_i: f32,
     pub straight_pid_d: f32,
     // turn configuration
-    pub turn_left_left_power: f32,
-    pub turn_left_right_power: f32,
-    pub turn_right_left_power: f32,
-    pub turn_right_right_power: f32,
+    /// Motor power for left turn in integer percent (max 100)
+    pub turn_left_left_power: u8,
+    /// Motor power for right turn in integer percent (max 100)
+    pub turn_left_right_power: u8,
+    /// Motor power for left turn in integer percent (max 100)
+    pub turn_right_left_power: u8,
+    /// Motor power for right turn in integer percent (max 100)
+    pub turn_right_right_power: u8,
     pub turn_left_stop_angle_delta: i32,
     pub turn_right_stop_angle_delta: i32,
     // general configuration
@@ -41,10 +47,10 @@ impl Config {
             straight_pid_p: STRAIGHT_PID_P,
             straight_pid_i: STRAIGHT_PID_I,
             straight_pid_d: STRAIGHT_PID_D,
-            turn_left_left_power: 1.0,
-            turn_left_right_power: 1.0,
-            turn_right_left_power: 1.0,
-            turn_right_right_power: 1.0,
+            turn_left_left_power: 100,
+            turn_left_right_power: 100,
+            turn_right_left_power: 100,
+            turn_right_right_power: 100,
             turn_left_stop_angle_delta: 0,
             turn_right_stop_angle_delta: 0,
             wheel_ticks_per_mm: WHEEL_TICKS_PER_MM,
@@ -64,16 +70,22 @@ impl Config {
                     match key.trim() {
                         "straight_left_power" => {
                             if value.is_some() {
-                                if let Ok(power) = value.unwrap().trim().parse::<f32>() {
+                                if let Ok(power) = value.unwrap().trim().parse::<u8>() {
                                     self.straight_left_power = power;
+                                    if self.straight_left_power > 100 {
+                                        self.straight_left_power = 100;
+                                    }
                                     info!("CONFIG: left motor power = {}", power);
                                 }
                             }
                         }
                         "straight_right_power" => {
                             if value.is_some() {
-                                if let Ok(power) = value.unwrap().trim().parse::<f32>() {
+                                if let Ok(power) = value.unwrap().trim().parse::<u8>() {
                                     self.straight_right_power = power;
+                                    if self.straight_right_power > 100 {
+                                        self.straight_right_power = 100;
+                                    }
                                     info!("CONFIG: right motor power = {}", power);
                                 }
                             }
@@ -113,32 +125,44 @@ impl Config {
                         }
                         "turn_left_left_power" => {
                             if value.is_some() {
-                                if let Ok(power) = value.unwrap().trim().parse::<f32>() {
+                                if let Ok(power) = value.unwrap().trim().parse::<u8>() {
                                     self.turn_left_left_power = power;
+                                    if self.turn_left_left_power > 100 {
+                                        self.turn_left_left_power = 100;
+                                    }
                                     info!("CONFIG: left motor power for left turn = {}", power);
                                 }
                             }
                         }
                         "turn_left_right_power" => {
                             if value.is_some() {
-                                if let Ok(power) = value.unwrap().trim().parse::<f32>() {
+                                if let Ok(power) = value.unwrap().trim().parse::<u8>() {
                                     self.turn_left_right_power = power;
+                                    if self.turn_left_right_power > 100 {
+                                        self.turn_left_right_power = 100;
+                                    }
                                     info!("CONFIG: right motor power for left turn = {}", power);
                                 }
                             }
                         }
                         "turn_right_left_power" => {
                             if value.is_some() {
-                                if let Ok(power) = value.unwrap().trim().parse::<f32>() {
+                                if let Ok(power) = value.unwrap().trim().parse::<u8>() {
                                     self.turn_right_left_power = power;
+                                    if self.turn_right_left_power > 100 {
+                                        self.turn_right_left_power = 100;
+                                    }
                                     info!("CONFIG: left motor power for right turn = {}", power);
                                 }
                             }
                         }
                         "turn_right_right_power" => {
                             if value.is_some() {
-                                if let Ok(power) = value.unwrap().trim().parse::<f32>() {
+                                if let Ok(power) = value.unwrap().trim().parse::<u8>() {
                                     self.turn_right_right_power = power;
+                                    if self.turn_right_right_power > 100 {
+                                        self.turn_right_right_power = 100;
+                                    }
                                     info!("CONFIG: right motor power for right turn = {}", power);
                                 }
                             }

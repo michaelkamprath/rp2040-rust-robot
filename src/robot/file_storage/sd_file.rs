@@ -3,37 +3,30 @@ use alloc::rc::Rc;
 use alloc::string::String;
 use core::cell::RefCell;
 use defmt::{debug, error};
-use embedded_hal::blocking::delay::DelayUs;
-use embedded_hal::digital::v2::OutputPin;
-use embedded_sdmmc::{Directory, Mode, SdCard, SdCardError, VolumeManager};
+use embedded_hal::{delay::DelayNs, spi::SpiDevice};
+use embedded_sdmmc::{Mode, RawDirectory, SdCard, SdCardError, VolumeManager};
 
-pub struct SDFile<SPI, CS, DELAY>
+pub struct SDFile<SPI_DEV, DELAY>
 where
-    SPI: embedded_hal::blocking::spi::Transfer<u8> + embedded_hal::blocking::spi::Write<u8>,
-    <SPI as embedded_hal::blocking::spi::Transfer<u8>>::Error: core::fmt::Debug,
-    <SPI as embedded_hal::blocking::spi::Write<u8>>::Error: core::fmt::Debug,
-    CS: OutputPin,
-    DELAY: DelayUs<u8>,
+    SPI_DEV: SpiDevice<u8>,
+    DELAY: DelayNs,
 {
     filename: String,
-    directory: Directory,
+    directory: RawDirectory,
     mode: Mode,
-    volume_manager: Rc<RefCell<VolumeManager<SdCard<SPI, CS, DELAY>, DummyTimesource>>>,
+    volume_manager: Rc<RefCell<VolumeManager<SdCard<SPI_DEV, DELAY>, DummyTimesource>>>,
 }
 
-impl<SPI, CS, DELAY> SDFile<SPI, CS, DELAY>
+impl<SPI_DEV, DELAY> SDFile<SPI_DEV, DELAY>
 where
-    SPI: embedded_hal::blocking::spi::Transfer<u8> + embedded_hal::blocking::spi::Write<u8>,
-    <SPI as embedded_hal::blocking::spi::Transfer<u8>>::Error: core::fmt::Debug,
-    <SPI as embedded_hal::blocking::spi::Write<u8>>::Error: core::fmt::Debug,
-    CS: OutputPin,
-    DELAY: DelayUs<u8>,
+    SPI_DEV: SpiDevice<u8>,
+    DELAY: DelayNs,
 {
     pub fn new(
         filename: &str,
-        directory: Directory,
+        directory: RawDirectory,
         mode: Mode,
-        volume_manager: Rc<RefCell<VolumeManager<SdCard<SPI, CS, DELAY>, DummyTimesource>>>,
+        volume_manager: Rc<RefCell<VolumeManager<SdCard<SPI_DEV, DELAY>, DummyTimesource>>>,
     ) -> Self {
         Self {
             filename: String::from(filename),
@@ -99,19 +92,16 @@ where
             self.filename.as_str(),
             Mode::ReadWriteAppend,
         )?;
-        let write_size = self.volume_manager.borrow_mut().write(file, buf)?;
+        self.volume_manager.borrow_mut().write(file, buf)?;
         self.volume_manager.borrow_mut().close_file(file)?;
-        Ok(write_size)
+        Ok(buf.len())
     }
 }
 
-impl<SPI, CS, DELAY> Drop for SDFile<SPI, CS, DELAY>
+impl<SPI_DEV, DELAY> Drop for SDFile<SPI_DEV, DELAY>
 where
-    SPI: embedded_hal::blocking::spi::Transfer<u8> + embedded_hal::blocking::spi::Write<u8>,
-    <SPI as embedded_hal::blocking::spi::Transfer<u8>>::Error: core::fmt::Debug,
-    <SPI as embedded_hal::blocking::spi::Write<u8>>::Error: core::fmt::Debug,
-    CS: OutputPin,
-    DELAY: DelayUs<u8>,
+    SPI_DEV: SpiDevice<u8>,
+    DELAY: DelayNs,
 {
     fn drop(&mut self) {
         if let Err(e) = self.volume_manager.borrow_mut().close_dir(self.directory) {

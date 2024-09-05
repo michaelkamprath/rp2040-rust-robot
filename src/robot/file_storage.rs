@@ -1,14 +1,14 @@
 #![allow(clippy::type_complexity)]
 pub mod logger;
+pub mod sd_card_spi_device;
 pub mod sd_file;
 
 use alloc::{rc::Rc, string::ToString, vec::Vec};
 use core::cell::RefCell;
 use defmt::{debug, error, info};
-use embedded_hal::blocking::delay::DelayUs;
-use embedded_hal::digital::v2::OutputPin;
+use embedded_hal::{delay::DelayNs, spi::SpiDevice};
 use embedded_sdmmc::{
-    DirEntry, Directory, Mode, SdCard, SdCardError, TimeSource, Timestamp, Volume, VolumeIdx,
+    DirEntry, Mode, RawDirectory, RawVolume, SdCard, SdCardError, TimeSource, Timestamp, VolumeIdx,
     VolumeManager,
 };
 use sd_file::SDFile;
@@ -32,30 +32,24 @@ impl TimeSource for DummyTimesource {
     }
 }
 
-pub struct FileStorage<SPI, CS, DELAY>
+pub struct FileStorage<SPI_DEV, DELAY>
 where
-    SPI: embedded_hal::blocking::spi::Transfer<u8> + embedded_hal::blocking::spi::Write<u8>,
-    <SPI as embedded_hal::blocking::spi::Transfer<u8>>::Error: core::fmt::Debug,
-    <SPI as embedded_hal::blocking::spi::Write<u8>>::Error: core::fmt::Debug,
-    CS: OutputPin,
-    DELAY: DelayUs<u8>,
+    SPI_DEV: SpiDevice<u8>,
+    DELAY: DelayNs,
 {
-    volume_mgr: Option<Rc<RefCell<VolumeManager<SdCard<SPI, CS, DELAY>, DummyTimesource>>>>,
-    volume: Option<Volume>,
-    root_dir: Option<Directory>,
+    volume_mgr: Option<Rc<RefCell<VolumeManager<SdCard<SPI_DEV, DELAY>, DummyTimesource>>>>,
+    volume: Option<RawVolume>,
+    root_dir: Option<RawDirectory>,
 }
 
-impl<SPI, CS, DELAY> FileStorage<SPI, CS, DELAY>
+impl<SPI_DEV, DELAY> FileStorage<SPI_DEV, DELAY>
 where
-    SPI: embedded_hal::blocking::spi::Transfer<u8> + embedded_hal::blocking::spi::Write<u8>,
-    <SPI as embedded_hal::blocking::spi::Transfer<u8>>::Error: core::fmt::Debug,
-    <SPI as embedded_hal::blocking::spi::Write<u8>>::Error: core::fmt::Debug,
-    CS: OutputPin,
-    DELAY: DelayUs<u8>,
+    SPI_DEV: SpiDevice<u8>,
+    DELAY: DelayNs,
 {
-    pub fn new(spi: SPI, cs: CS, delay: DELAY) -> Self {
+    pub fn new(spi: SPI_DEV, delay: DELAY) -> Self {
         info!("Initialize SPI SD/MMC data structures...");
-        let sd_card = SdCard::new(spi, cs, delay);
+        let sd_card = SdCard::new(spi, delay);
         let mut volume_mgr = VolumeManager::new(sd_card, DummyTimesource::default());
 
         // check that we can read the volumn size
@@ -88,7 +82,8 @@ where
         // After we have the volume (partition) of the drive we got to open the
         // root directory:
         debug!("Opening root dir...");
-        let root_dir = match volume_mgr.open_root_dir(volume) {
+        let raw_volume = volume.to_raw_volume();
+        let root_dir = match volume_mgr.open_root_dir(raw_volume) {
             Ok(dir) => dir,
             Err(e) => {
                 error!("Error opening root dir: {}", defmt::Debug2Format(&e));
@@ -103,14 +98,14 @@ where
 
         Self {
             volume_mgr: Some(Rc::new(RefCell::new(volume_mgr))),
-            volume: Some(volume),
+            volume: Some(raw_volume),
             root_dir: Some(root_dir),
         }
     }
 
     pub fn volume_manager(
         &self,
-    ) -> Option<Rc<RefCell<VolumeManager<SdCard<SPI, CS, DELAY>, DummyTimesource>>>> {
+    ) -> Option<Rc<RefCell<VolumeManager<SdCard<SPI_DEV, DELAY>, DummyTimesource>>>> {
         self.volume_mgr.clone()
     }
 
@@ -131,11 +126,11 @@ where
         }
     }
 
-    pub fn root_dir(&self) -> Option<Directory> {
+    pub fn root_dir(&self) -> Option<RawDirectory> {
         self.root_dir
     }
 
-    pub fn open_directory(&self, parent: Directory, name: &str) -> Option<Directory> {
+    pub fn open_directory(&self, parent: RawDirectory, name: &str) -> Option<RawDirectory> {
         match self
             .volume_mgr
             .as_ref()?
@@ -152,7 +147,7 @@ where
 
     pub fn spi<T, F>(&self, func: F) -> Option<T>
     where
-        F: FnOnce(&mut SPI) -> T,
+        F: FnOnce(&mut SPI_DEV) -> T,
     {
         Some(
             self.volume_mgr
@@ -167,9 +162,9 @@ where
     pub fn open_file_in_dir(
         &mut self,
         filename: &str,
-        directory: Directory,
+        directory: RawDirectory,
         mode: Mode,
-    ) -> Result<SDFile<SPI, CS, DELAY>, embedded_sdmmc::Error<SdCardError>> {
+    ) -> Result<SDFile<SPI_DEV, DELAY>, embedded_sdmmc::Error<SdCardError>> {
         Ok(SDFile::new(
             filename,
             directory,
@@ -180,7 +175,7 @@ where
 
     pub fn iterate_dir<F>(
         &self,
-        dir: Directory,
+        dir: RawDirectory,
         func: F,
     ) -> Result<(), embedded_sdmmc::Error<SdCardError>>
     where
@@ -195,7 +190,7 @@ where
 
     pub fn list_files_in_dir_with_ext(
         &self,
-        parent_dir: Directory,
+        parent_dir: RawDirectory,
         target_dir: &str,
         ext: &str,
     ) -> Result<Vec<DirEntry>, embedded_sdmmc::Error<SdCardError>> {
@@ -216,13 +211,10 @@ where
     }
 }
 
-impl<SPI, CS, DELAY> Drop for FileStorage<SPI, CS, DELAY>
+impl<SPI_DEV, DELAY> Drop for FileStorage<SPI_DEV, DELAY>
 where
-    SPI: embedded_hal::blocking::spi::Transfer<u8> + embedded_hal::blocking::spi::Write<u8>,
-    <SPI as embedded_hal::blocking::spi::Transfer<u8>>::Error: core::fmt::Debug,
-    <SPI as embedded_hal::blocking::spi::Write<u8>>::Error: core::fmt::Debug,
-    CS: OutputPin,
-    DELAY: DelayUs<u8>,
+    SPI_DEV: SpiDevice,
+    DELAY: DelayNs,
 {
     fn drop(&mut self) {
         info!("FileStorage dropped");

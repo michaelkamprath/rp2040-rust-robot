@@ -29,12 +29,11 @@ use core::{
 use cortex_m::interrupt::Mutex;
 use defmt::{debug, error, info, warn, Format};
 use embedded_hal::{
-    blocking::{
-        delay::{DelayMs, DelayUs},
-        i2c::{Write as I2cWrite, WriteRead},
-    },
-    digital::v2::{InputPin, OutputPin},
-    PwmPin,
+    delay::DelayNs,
+    digital::{InputPin, OutputPin},
+    i2c::I2c,
+    pwm::SetDutyCycle,
+    spi::SpiDevice,
 };
 use micromath::F32Ext;
 use rp_pico::hal::gpio;
@@ -45,7 +44,6 @@ use rp_pico::hal::{
     },
     pac::{self, interrupt},
 };
-use shared_bus::BusManagerCortexM;
 
 const UP_ARROW_CHARACTER_DEFINITION: [u8; 8] = [
     0b00000, 0b00100, 0b01110, 0b10101, 0b00100, 0b00100, 0b00100, 0b00000,
@@ -96,31 +94,26 @@ pub struct Robot<
     INA2: OutputPin,
     INB1: OutputPin,
     INB2: OutputPin,
-    ENA: PwmPin<Duty = u16>,
-    ENB: PwmPin<Duty = u16>,
+    ENA: SetDutyCycle,
+    ENB: SetDutyCycle,
     BUTT1: InputPin,
     BUTT2: InputPin,
     TWI,
-    TWI_ERR,
-    SPI: embedded_hal::blocking::spi::Transfer<u8> + embedded_hal::blocking::spi::Write<u8>,
-    CS: OutputPin,
+    SPI_DEV: embedded_hal::spi::SpiDevice<u8>,
     DELAY,
 > where
-    TWI: I2cWrite<Error = TWI_ERR> + WriteRead<Error = TWI_ERR>,
-    TWI_ERR: defmt::Format,
-    <SPI as embedded_hal::blocking::spi::Transfer<u8>>::Error: core::fmt::Debug,
-    <SPI as embedded_hal::blocking::spi::Write<u8>>::Error: core::fmt::Debug,
-    DELAY: DelayMs<u16> + DelayUs<u16> + DelayMs<u8> + DelayUs<u8>,
+    TWI: embedded_hal::i2c::I2c,
+    DELAY: DelayNs,
 {
     motors: MotorController<INA1, INA2, INB1, INB2, ENA, ENB>,
     button1: DebouncedButton<BUTT1, false, BUTTON_DEBOUNCE_TIME_MS>,
     button2: DebouncedButton<BUTT2, false, BUTTON_DEBOUNCE_TIME_MS>,
-    pub heading_calculator: HeadingCalculator<shared_bus::I2cProxy<'a, Mutex<RefCell<TWI>>>, DELAY>,
-    lcd: LcdBackpack<shared_bus::I2cProxy<'a, Mutex<RefCell<TWI>>>, DELAY>,
-    pub sd_card: FileStorage<SPI, CS, DELAY>,
+    pub heading_calculator: HeadingCalculator<embedded_hal_bus::i2c::RefCellDevice<'a, TWI>, DELAY>,
+    lcd: LcdBackpack<embedded_hal_bus::i2c::RefCellDevice<'a, TWI>, DELAY>,
+    pub sd_card: FileStorage<SPI_DEV, DELAY>,
     reset_display_start_millis: u32,
     log_index: u32,
-    pub logger: Logger<SPI, CS, DELAY, 128>,
+    pub logger: Logger<SPI_DEV, DELAY, 128>,
     idle_message_line2: Option<String>,
     config: Config,
 }
@@ -132,22 +125,17 @@ impl<
         INA2: OutputPin,
         INB1: OutputPin,
         INB2: OutputPin,
-        ENA: PwmPin<Duty = u16>,
-        ENB: PwmPin<Duty = u16>,
+        ENA: SetDutyCycle,
+        ENB: SetDutyCycle,
         BUTT1: InputPin,
         BUTT2: InputPin,
         TWI,
-        TWI_ERR,
-        SPI: embedded_hal::blocking::spi::Transfer<u8> + embedded_hal::blocking::spi::Write<u8>,
-        CS: OutputPin,
+        SPI_DEV: embedded_hal::spi::SpiDevice<u8>,
         DELAY,
-    > Robot<'a, INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI, TWI_ERR, SPI, CS, DELAY>
+    > Robot<'a, INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI, SPI_DEV, DELAY>
 where
-    TWI: I2cWrite<Error = TWI_ERR> + WriteRead<Error = TWI_ERR>,
-    TWI_ERR: defmt::Format,
-    DELAY: DelayMs<u16> + DelayUs<u16> + DelayMs<u8> + DelayUs<u8> + Copy,
-    <SPI as embedded_hal::blocking::spi::Transfer<u8>>::Error: core::fmt::Debug,
-    <SPI as embedded_hal::blocking::spi::Write<u8>>::Error: core::fmt::Debug,
+    TWI: embedded_hal::i2c::I2c,
+    DELAY: DelayNs + Clone,
 {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
@@ -155,18 +143,18 @@ where
         ina2_pin: INA2,
         inb1_pin: INB1,
         inb2_pin: INB2,
-        ena_pin: ENA,
-        enb_pin: ENB,
+        duty_a: ENA,
+        duty_b: ENB,
         button1_pin: BUTT1,
         button2_pin: BUTT2,
-        i2c_manager: &'a BusManagerCortexM<TWI>,
+        i2c_refcell: &'a RefCell<TWI>,
         left_counter_pin: LeftWheelCounterPin,
         right_counter_pin: RightWheelCounterPin,
-        mut sd_card: FileStorage<SPI, CS, DELAY>,
+        mut sd_card: FileStorage<SPI_DEV, DELAY>,
         delay: &mut DELAY,
     ) -> Self {
         // create the motor controller
-        let motors = MotorController::new(ina1_pin, ina2_pin, inb1_pin, inb2_pin, ena_pin, enb_pin);
+        let motors = MotorController::new(ina1_pin, ina2_pin, inb1_pin, inb2_pin, duty_a, duty_b);
 
         // enable interrupts for wheel encoders
         cortex_m::interrupt::free(|cs| {
@@ -183,46 +171,49 @@ where
             pac::NVIC::unmask(pac::Interrupt::IO_IRQ_BANK0);
         }
 
-        let mut lcd = LcdBackpack::new(LcdDisplayType::Lcd16x2, i2c_manager.acquire_i2c(), *delay);
+        let i2c_device = embedded_hal_bus::i2c::RefCellDevice::new(i2c_refcell);
+        let mut lcd = LcdBackpack::new(LcdDisplayType::Lcd16x2, i2c_device, delay.clone());
         match lcd.init() {
             Ok(_) => {
                 info!("LCD initialized");
             }
-            Err(e) => {
-                error!("Error initializing LCD: {}", e);
+            Err(_e) => {
+                error!("Error initializing LCD");
             }
         };
 
-        if let Err(error) =
+        if let Err(_e) =
             lcd.create_char(UP_ARROW_STRING.as_bytes()[0], UP_ARROW_CHARACTER_DEFINITION)
         {
-            error!("Error creating up arrow character: {}", error);
+            error!("Error creating up arrow character");
         };
-        if let Err(error) = lcd.create_char(
+        if let Err(_e) = lcd.create_char(
             DOWN_ARROW_STRING.as_bytes()[0],
             DOWN_ARROW_CHARACTER_DEFINITION,
         ) {
-            error!("Error creating down arrow character: {}", error);
+            error!("Error creating down arrow character");
         };
-        if let Err(error) =
-            lcd.create_char(DEGREES_STRING.as_bytes()[0], DEGREES_CHARACTER_DEFINITION)
+        if let Err(_e) = lcd.create_char(DEGREES_STRING.as_bytes()[0], DEGREES_CHARACTER_DEFINITION)
         {
-            error!("Error creating degrees character: {}", error);
+            error!("Error creating degrees character");
         };
+        debug!("LCD characters created");
 
-        if let Err(error) = lcd
+        if let Err(_e) = lcd
             .home()
             .and_then(LcdBackpack::clear)
             .and_then(|lcd| LcdBackpack::print(lcd, "Calibrating Gyro"))
         {
-            error!("Error writing to LCD: {}", error);
+            error!("Error writing to LCD");
         }
 
-        let heading_i2c = i2c_manager.acquire_i2c();
-        let mut heading_calculator = HeadingCalculator::new(heading_i2c, delay);
+        let mut heading_calculator = HeadingCalculator::new(
+            embedded_hal_bus::i2c::RefCellDevice::new(i2c_refcell),
+            delay,
+        );
         heading_calculator.reset();
 
-        if let Err(error) = lcd
+        if let Err(_e) = lcd
             .home()
             .and_then(LcdBackpack::clear)
             .and_then(|lcd| LcdBackpack::print(lcd, "Robot Started"))
@@ -235,10 +226,10 @@ where
                 .map_err(|_e| adafruit_lcd_backpack::Error::FormattingError)
             })
         {
-            error!("Error writing to LCD: {}", error);
+            error!("Error writing to LCD");
         }
 
-        let logger = Logger::new(Logger::<SPI, CS, DELAY, 128>::init_log_file(&mut sd_card));
+        let logger = Logger::new(Logger::<SPI_DEV, DELAY, 128>::init_log_file(&mut sd_card));
         Self {
             motors,
             button1: DebouncedButton::<BUTT1, false, BUTTON_DEBOUNCE_TIME_MS>::new(button1_pin),
@@ -263,7 +254,7 @@ where
                 Some(d) => d,
                 None => {
                     error!("Error opening config directory");
-                    return Err(embedded_sdmmc::Error::FileNotFound);
+                    return Err(embedded_sdmmc::Error::NotFound);
                 }
             };
             if let Ok(mut config_file) = self.sd_card.open_file_in_dir(
@@ -368,12 +359,6 @@ where
         cortex_m::interrupt::free(|cs| RIGHT_WHEEL_COUNTER.borrow(cs).get())
     }
 
-    /// Returns a duty value normalized to the max duty of the motor.
-    /// The duty is clamped to the range [0, 1].
-    fn noramlize_duty(&self, duty: f32) -> u16 {
-        (duty.max(0.0).min(1.0) * self.motors.enable_pin_a().get_max_duty() as f32) as u16
-    }
-
     /// returns true if the button 1 is newly pressed
     pub fn button1_pressed(&mut self) -> bool {
         self.button1.is_newly_pressed()
@@ -450,8 +435,8 @@ where
         self.heading_calculator.reset();
 
         self.motors.set_duty(
-            self.noramlize_duty(self.config.straight_left_power),
-            self.noramlize_duty(self.config.straight_right_power),
+            self.config.straight_left_power,
+            self.config.straight_right_power,
         );
 
         writeln!(
@@ -461,8 +446,8 @@ where
                 millis(),
                 0,
                 0,
-                1.0,
-                1.0,
+                100,
+                100,
                 self.heading_calculator.heading(),
                 0.,
             ),
@@ -489,8 +474,8 @@ where
 
                 let mut cs_indicator: &str = direction_arrow;
                 // positive control signal means turn left, a negative control signal means turn right
-                let mut left_power: f32 = self.config.straight_left_power;
-                let mut right_power: f32 = self.config.straight_right_power;
+                let mut left_power: f32 = self.config.straight_left_power as f32;
+                let mut right_power: f32 = self.config.straight_right_power as f32;
                 if (forward && control_signal > 0.) || (!forward && control_signal < 0.) {
                     left_power -= control_signal;
                     cs_indicator = LEFT_ARROW_STRING;
@@ -498,10 +483,10 @@ where
                     right_power += control_signal;
                     cs_indicator = RIGHT_ARROW_STRING;
                 }
-                self.motors.set_duty(
-                    self.noramlize_duty(left_power),
-                    self.noramlize_duty(right_power),
-                );
+                left_power = left_power.clamp(0., 100.);
+                right_power = right_power.clamp(0., 100.);
+
+                self.motors.set_duty(left_power as u8, right_power as u8);
 
                 writeln!(
                     self.logger,
@@ -510,8 +495,8 @@ where
                         last_update_millis,
                         left_wheel_ticks,
                         right_wheel_ticks,
-                        left_power,
-                        right_power,
+                        left_power as u8,
+                        right_power as u8,
                         heading,
                         control_signal,
                     ),
@@ -562,8 +547,8 @@ where
                 millis(),
                 left_wheel_ticks,
                 right_wheel_ticks,
-                0.,
-                0.,
+                0,
+                0,
                 self.heading_calculator.heading(),
                 0.,
             ),
@@ -619,16 +604,16 @@ where
         let mut stop_angle_delta: i32 = 0;
         if turn_degrees > 0 {
             self.motors.set_duty(
-                self.noramlize_duty(self.config.turn_left_left_power),
-                self.noramlize_duty(self.config.turn_left_right_power),
+                self.config.turn_left_left_power,
+                self.config.turn_left_right_power,
             );
             self.motors.reverse_a();
             self.motors.forward_b();
             stop_angle_delta = self.config.turn_left_stop_angle_delta;
         } else {
             self.motors.set_duty(
-                self.noramlize_duty(self.config.turn_right_left_power),
-                self.noramlize_duty(self.config.turn_right_right_power),
+                self.config.turn_right_left_power,
+                self.config.turn_right_right_power,
             );
             self.motors.forward_a();
             self.motors.reverse_b();
@@ -687,7 +672,7 @@ where
     //--------------------------------------------------------------------------
     // Test functions
     //--------------------------------------------------------------------------
-    pub fn display_heading(&mut self) -> Result<(), adafruit_lcd_backpack::Error<TWI_ERR>> {
+    pub fn display_heading(&mut self) -> Result<(), adafruit_lcd_backpack::Error<TWI::Error>> {
         write!(self.lcd.clear()?.set_cursor(0, 0)?, "Heading:").ok();
         self.heading_calculator.reset();
         let mut continue_loop = true;
@@ -738,23 +723,17 @@ impl<
         INA2: OutputPin,
         INB1: OutputPin,
         INB2: OutputPin,
-        ENA: PwmPin<Duty = u16>,
-        ENB: PwmPin<Duty = u16>,
+        ENA: SetDutyCycle,
+        ENB: SetDutyCycle,
         BUTT1: InputPin,
         BUTT2: InputPin,
         TWI,
-        TWI_ERR,
-        SPI: embedded_hal::blocking::spi::Transfer<u8> + embedded_hal::blocking::spi::Write<u8>,
-        CS: OutputPin,
+        SPI_DEV: SpiDevice<u8>,
         DELAY,
-    > Format
-    for Robot<'a, INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI, TWI_ERR, SPI, CS, DELAY>
+    > Format for Robot<'a, INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI, SPI_DEV, DELAY>
 where
-    TWI: I2cWrite<Error = TWI_ERR> + WriteRead<Error = TWI_ERR>,
-    TWI_ERR: defmt::Format,
-    DELAY: DelayMs<u16> + DelayUs<u16> + DelayMs<u8> + DelayUs<u8> + Copy,
-    <SPI as embedded_hal::blocking::spi::Transfer<u8>>::Error: core::fmt::Debug,
-    <SPI as embedded_hal::blocking::spi::Write<u8>>::Error: core::fmt::Debug,
+    TWI: I2c,
+    DELAY: DelayNs + Clone,
 {
     fn format(&self, f: defmt::Formatter) {
         defmt::write!(
@@ -773,23 +752,18 @@ impl<
         INA2: OutputPin,
         INB1: OutputPin,
         INB2: OutputPin,
-        ENA: PwmPin<Duty = u16>,
-        ENB: PwmPin<Duty = u16>,
+        ENA: SetDutyCycle,
+        ENB: SetDutyCycle,
         BUTT1: InputPin,
         BUTT2: InputPin,
         TWI,
-        TWI_ERR,
-        SPI: embedded_hal::blocking::spi::Transfer<u8> + embedded_hal::blocking::spi::Write<u8>,
-        CS: OutputPin,
+        SPI_DEV: SpiDevice<u8>,
         DELAY,
     > core::fmt::Write
-    for Robot<'a, INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI, TWI_ERR, SPI, CS, DELAY>
+    for Robot<'a, INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI, SPI_DEV, DELAY>
 where
-    TWI: I2cWrite<Error = TWI_ERR> + WriteRead<Error = TWI_ERR>,
-    TWI_ERR: defmt::Format,
-    DELAY: DelayMs<u16> + DelayUs<u16> + DelayMs<u8> + DelayUs<u8> + Copy,
-    <SPI as embedded_hal::blocking::spi::Transfer<u8>>::Error: core::fmt::Debug,
-    <SPI as embedded_hal::blocking::spi::Write<u8>>::Error: core::fmt::Debug,
+    TWI: I2c,
+    DELAY: DelayNs + Clone,
 {
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
         self.lcd.write_str(s)

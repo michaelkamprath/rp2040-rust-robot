@@ -12,11 +12,11 @@ bench = false
 [dependencies]
 cortex-m = "0.7"
 cortex-m-rt = "0.7"
-embedded-hal = { version = "0.2", features = ["unproven"] }
-embedded-sdmmc = { version = "0.6", default-features = false, features = [
+embedded-hal = { version = "1.0" }
+embedded-sdmmc = { version = "0.8", default-features = false, features = [
     "defmt-log",
 ] }
-shared-bus = { version = "0.3", features = ["cortex-m"] }
+embedded-hal-bus = { version = "0.1", features = ["defmt-03"] }
 defmt = "0.3"
 defmt-rtt = "0.4"
 panic-probe = { version = "0.3", features = ["print-defmt"] }
@@ -24,18 +24,18 @@ micromath = { version = "2.1", features = ["vector"] }
 mpu6050 = { git = "https://github.com/michaelkamprath/mpu6050.git", branch = "micromath", features = [
     "defmt",
 ] }
-embedded-alloc = "0.5"
-adafruit-lcd-backpack = { version = "0.1", features = ["defmt"] }
+embedded-alloc = "0.6"
+adafruit-lcd-backpack = { version = "0.2", features = ["defmt"] }
 ini_core = "0.2"
 
 # We're using a Pico by default on this template
-rp-pico = "0.8"
+rp-pico = "0.9"
 
 # but you can use any BSP. Uncomment this to use the pro_micro_rp2040 BSP instead
 # sparkfun-pro-micro-rp2040 = "0.7"
 
 # If you're not going to use a Board Support Package you'll need these:
-rp2040-hal = { version = "0.9", features = [
+rp2040-hal = { version = "0.10", features = [
     "rt",
     "critical-section-impl",
     "defmt",
@@ -94,8 +94,10 @@ incremental = false
 lto = 'fat'
 opt-level = 3
 
-# [patch."https://github.com/michaelkamprath/mpu6050.git"]
-# mpu6050 = { path = "../mpu6050" }
+[patch."https://github.com/michaelkamprath/mpu6050.git"]
+mpu6050 = { path = "../mpu6050" }
 
-# [patch."https://github.com/michaelkamprath/adafruit-lcd-backpack-rust.git"]
-# adafruit-lcd-backpack = { path = "../adafruit-lcd-backpack-rust" }
+[patch.crates-io]
+adafruit-lcd-backpack = { path = "../adafruit-lcd-backpack-rust" }
+mcp230xx = { path = "../mcp230xx" }
+shared-bus = { path = "../shared-bus" }

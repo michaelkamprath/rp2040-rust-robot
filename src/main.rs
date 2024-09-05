@@ -9,15 +9,17 @@ use bsp::{
     entry,
     hal::{fugit::HertzU32, gpio},
 };
+use core::cell::RefCell;
 use defmt::{error, info, panic};
 use defmt_rtt as _;
+use embedded_alloc::LlffHeap as Heap;
 use panic_probe as _;
 use rp2040_hal::{
     gpio::{
-        bank0::{Gpio0, Gpio2, Gpio3, Gpio4, Gpio5},
-        FunctionI2c, FunctionSpi, Pin, PullDown,
+        bank0::{Gpio0, Gpio2, Gpio3},
+        FunctionSpi, PullDown,
     },
-    pac::{I2C0, SPI0},
+    pac::SPI0,
 };
 
 // Provide an alias for our BSP so we can switch targets quickly.
@@ -26,8 +28,6 @@ use rp_pico as bsp;
 // use sparkfun_pro_micro_rp2040 as bsp;
 
 extern crate alloc;
-
-use embedded_alloc::Heap;
 
 #[global_allocator]
 static HEAP: Heap = Heap::empty();
@@ -40,8 +40,8 @@ use bsp::hal::{
     watchdog::Watchdog,
 };
 
+use crate::robot::Robot;
 use driver::Driver;
-use robot::Robot;
 use system::millis::init_millis;
 
 #[entry]
@@ -109,8 +109,7 @@ fn main() -> ! {
         &mut pac.RESETS,
         clocks.system_clock.freq(),
     );
-    let i2c_manager: &'static _ = shared_bus::new_cortexm!(rp2040_hal::I2C<I2C0, (Pin<Gpio4, FunctionI2c, PullDown>, Pin<Gpio5, FunctionI2c, PullDown>)> = i2c).unwrap();
-
+    let i2c_ref_cell = RefCell::new(i2c);
     // set up SPI
     #[allow(clippy::type_complexity)]
     let spi: rp_pico::hal::Spi<
@@ -139,14 +138,17 @@ fn main() -> ! {
     );
 
     let sd = crate::robot::file_storage::FileStorage::new(
-        spi,
-        pins.gpio1.into_push_pull_output(),
+        crate::robot::file_storage::sd_card_spi_device::SDCardSPIDevice::new(
+            spi,
+            pins.gpio1.into_push_pull_output(),
+            timer,
+        ),
         timer,
     );
 
     // If SD card is successfully initialized, we can increase the SPI speed
     match sd.spi(|spi| {
-        spi.set_baudrate(
+        spi.bus.set_baudrate(
             clocks.peripheral_clock.freq(),
             HertzU32::from_raw(20_000_000),
         )
@@ -168,7 +170,7 @@ fn main() -> ! {
         channel_b,
         pins.gpio14.into_pull_up_input(),
         pins.gpio15.into_pull_up_input(),
-        i2c_manager,
+        &i2c_ref_cell,
         pins.gpio21.into_pull_up_input(),
         pins.gpio20.into_pull_up_input(),
         sd,
