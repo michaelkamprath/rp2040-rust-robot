@@ -1,3 +1,4 @@
+use defmt::{debug, error};
 use embedded_hal::{
     delay::DelayNs,
     digital::OutputPin,
@@ -51,31 +52,60 @@ where
     DELAY: DelayNs,
 {
     fn transaction(&mut self, operations: &mut [Operation<'_, u8>]) -> Result<(), Self::Error> {
+        debug!(
+            "SDCardSPIDevice::transaction - operations.len = {}",
+            operations.len()
+        );
         // Implement the SPI transaction here
         if self.cs.set_high().is_err() {
             return Err(SDCardSPIDeviceError::ChipSelect);
         }
         for operation in operations {
             if let Err(_e) = match operation {
-                Operation::Write(data) => self.bus.write(data),
-                Operation::Transfer(read_buf, write_buf) => self.bus.transfer(read_buf, write_buf),
-                Operation::Read(data) => self.bus.read(data),
-                Operation::TransferInPlace(data) => self.bus.transfer_in_place(data),
+                Operation::Write(data) => {
+                    debug!(
+                        "SDCardSPIDevice::transaction - write data.len = {}",
+                        data.len()
+                    );
+                    self.bus.write(data)
+                }
+                Operation::Transfer(read_buf, write_buf) => {
+                    debug!("SDCardSPIDevice::transaction - transfer read_buf.len = {}, write_buf.len = {}", read_buf.len(), write_buf.len());
+                    self.bus.transfer(read_buf, write_buf)
+                }
+                Operation::Read(data) => {
+                    debug!(
+                        "SDCardSPIDevice::transaction - read data.len = {}",
+                        data.len()
+                    );
+                    self.bus.read(data)
+                }
+                Operation::TransferInPlace(data) => {
+                    debug!(
+                        "SDCardSPIDevice::transaction - transfer_in_place data.len = {}",
+                        data.len()
+                    );
+                    self.bus.transfer_in_place(data)
+                }
                 Operation::DelayNs(time) => {
+                    debug!("SDCardSPIDevice::transaction - delay_ns time = {}", time);
                     self.delay.delay_ns(*time);
                     Ok(())
                 }
             } {
                 // iff an error accurs, deassert CS pin and return error
                 self.cs.set_low().ok();
+                error!("SDCardSPIDevice::transaction - error");
                 return Err(SDCardSPIDeviceError::Spi);
             }
         }
         if self.bus.flush().is_err() {
             self.cs.set_low().ok();
+            error!("SDCardSPIDevice::transaction - flush error");
             return Err(SDCardSPIDeviceError::Spi);
         }
         if self.cs.set_low().is_err() {
+            error!("SDCardSPIDevice::transaction - chip select error");
             return Err(SDCardSPIDeviceError::ChipSelect);
         }
         Ok(())

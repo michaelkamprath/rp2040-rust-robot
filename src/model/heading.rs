@@ -43,22 +43,24 @@ where
                 error!("Error initializing gyro");
             }
         };
-        if let Err(_error) = gyro.set_gyro_range(mpu6050::device::GyroRange::D250) {
-            error!("Error setting gyro range");
-        }
-
-        let cur_offsets = match gyro.get_gyro_offsets() {
-            Ok(offsets) => offsets,
-            Err(_error) => {
-                error!("Error getting gyro offsets");
-                Vector3d::<i32>::default()
+        if inited {
+            if let Err(_error) = gyro.set_gyro_range(mpu6050::device::GyroRange::D250) {
+                error!("Error setting gyro range");
             }
-        };
 
-        info!(
-            "Got gyro offsets: x = {}, y = {}, z = {}",
-            cur_offsets.x, cur_offsets.y, cur_offsets.z
-        );
+            let cur_offsets = match gyro.get_gyro_offsets() {
+                Ok(offsets) => offsets,
+                Err(_error) => {
+                    error!("Error getting gyro offsets");
+                    Vector3d::<i32>::default()
+                }
+            };
+
+            info!(
+                "Got gyro offsets: x = {}, y = {}, z = {}",
+                cur_offsets.x, cur_offsets.y, cur_offsets.z
+            );
+        }
 
         Self {
             heading: 0.0,

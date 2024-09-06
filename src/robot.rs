@@ -182,6 +182,7 @@ where
             }
         };
 
+        debug!("Creating custom character 1");
         if let Err(_e) =
             lcd.create_char(UP_ARROW_STRING.as_bytes()[0], UP_ARROW_CHARACTER_DEFINITION)
         {
@@ -193,12 +194,14 @@ where
         ) {
             error!("Error creating down arrow character");
         };
+        debug!("Creating custom character 2");
         if let Err(_e) = lcd.create_char(DEGREES_STRING.as_bytes()[0], DEGREES_CHARACTER_DEFINITION)
         {
             error!("Error creating degrees character");
         };
         debug!("LCD characters created");
 
+        debug!("Writing to LCD first message");
         if let Err(_e) = lcd
             .home()
             .and_then(LcdBackpack::clear)
@@ -206,7 +209,7 @@ where
         {
             error!("Error writing to LCD");
         }
-
+        delay.delay_ms(5000);
         let mut heading_calculator = HeadingCalculator::new(
             embedded_hal_bus::i2c::RefCellDevice::new(i2c_refcell),
             delay,
@@ -223,7 +226,7 @@ where
                     "SD: {} GB",
                     sd_card.volume_size().unwrap_or(0) / 1_073_741_824
                 )
-                .map_err(|_e| adafruit_lcd_backpack::Error::FormattingError)
+                .map_err(|_e| adafruit_lcd_backpack::BackpackError::FormattingError)
             })
         {
             error!("Error writing to LCD");
@@ -672,7 +675,9 @@ where
     //--------------------------------------------------------------------------
     // Test functions
     //--------------------------------------------------------------------------
-    pub fn display_heading(&mut self) -> Result<(), adafruit_lcd_backpack::Error<TWI::Error>> {
+    pub fn display_heading(
+        &mut self,
+    ) -> Result<(), adafruit_lcd_backpack::BackpackError<TWI::Error>> {
         write!(self.lcd.clear()?.set_cursor(0, 0)?, "Heading:").ok();
         self.heading_calculator.reset();
         let mut continue_loop = true;
