@@ -21,6 +21,7 @@ pub struct HeadingCalculator<TWI, DELAY> {
     gyro: Mpu6050<TWI>,
     last_update_rate: f32,
     last_update_millis: u32,
+    inited: bool,
     _delay: PhantomData<DELAY>,
 }
 
@@ -32,9 +33,11 @@ where
 {
     pub fn new(i2c: TWI, delay: &mut DELAY) -> Self {
         let mut gyro = Mpu6050::new(i2c);
+        let mut inited = false;
         match gyro.init(delay) {
             Ok(_) => {
                 info!("Gyro initialized");
+                inited = true;
             }
             Err(_e) => {
                 error!("Error initializing gyro");
@@ -62,11 +65,20 @@ where
             gyro,
             last_update_rate: 0.0,
             last_update_millis: millis(),
+            inited,
             _delay: PhantomData,
         }
     }
 
+    pub fn is_inited(&self) -> bool {
+        self.inited
+    }
+
     pub fn calibrate<F: FnMut(usize)>(&mut self, delay: &mut DELAY, callback: F) {
+        if !self.is_inited() {
+            error!("Gyro not initialized");
+            return;
+        }
         if let Err(_e) = self.gyro.calibrate_gyro(delay, callback) {
             error!("Error calibrating gyro");
         }
@@ -79,6 +91,9 @@ where
     }
 
     pub fn update(&mut self) -> f32 {
+        if !self.is_inited() {
+            return 0.0;
+        }
         let now = millis();
         let delta_time = now - self.last_update_millis;
         if delta_time >= HEADING_UPDATE_INTERVAL_MS {
