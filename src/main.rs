@@ -110,6 +110,8 @@ fn main() -> ! {
         clocks.system_clock.freq(),
     );
     let i2c_ref_cell = RefCell::new(i2c);
+    let i2c_mutex = critical_section::Mutex::new(i2c_ref_cell);
+
     // set up SPI
     #[allow(clippy::type_complexity)]
     let spi: rp_pico::hal::Spi<
@@ -170,7 +172,7 @@ fn main() -> ! {
         channel_b,
         pins.gpio14.into_pull_up_input(),
         pins.gpio15.into_pull_up_input(),
-        &i2c_ref_cell,
+        &i2c_mutex,
         pins.gpio21.into_pull_up_input(),
         pins.gpio20.into_pull_up_input(),
         sd,

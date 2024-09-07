@@ -108,8 +108,9 @@ pub struct Robot<
     motors: MotorController<INA1, INA2, INB1, INB2, ENA, ENB>,
     button1: DebouncedButton<BUTT1, false, BUTTON_DEBOUNCE_TIME_MS>,
     button2: DebouncedButton<BUTT2, false, BUTTON_DEBOUNCE_TIME_MS>,
-    pub heading_calculator: HeadingCalculator<embedded_hal_bus::i2c::RefCellDevice<'a, TWI>, DELAY>,
-    lcd: LcdBackpack<embedded_hal_bus::i2c::RefCellDevice<'a, TWI>, DELAY>,
+    pub heading_calculator:
+        HeadingCalculator<embedded_hal_bus::i2c::CriticalSectionDevice<'a, TWI>, DELAY>,
+    lcd: LcdBackpack<embedded_hal_bus::i2c::CriticalSectionDevice<'a, TWI>, DELAY>,
     pub sd_card: FileStorage<SPI_DEV, DELAY>,
     reset_display_start_millis: u32,
     log_index: u32,
@@ -147,7 +148,7 @@ where
         duty_b: ENB,
         button1_pin: BUTT1,
         button2_pin: BUTT2,
-        i2c_refcell: &'a RefCell<TWI>,
+        i2c_refcell: &'a critical_section::Mutex<RefCell<TWI>>,
         left_counter_pin: LeftWheelCounterPin,
         right_counter_pin: RightWheelCounterPin,
         mut sd_card: FileStorage<SPI_DEV, DELAY>,
@@ -171,7 +172,8 @@ where
             pac::NVIC::unmask(pac::Interrupt::IO_IRQ_BANK0);
         }
 
-        let i2c_device = embedded_hal_bus::i2c::RefCellDevice::new(i2c_refcell);
+        // let i2c_device = embedded_hal_bus::i2c::RefCellDevice::new(i2c_refcell);
+        let i2c_device = embedded_hal_bus::i2c::CriticalSectionDevice::new(i2c_refcell);
         let mut lcd = LcdBackpack::new(LcdDisplayType::Lcd16x2, i2c_device, delay.clone());
         match lcd.init() {
             Ok(_) => {
@@ -211,7 +213,7 @@ where
         }
         delay.delay_ms(5000);
         let mut heading_calculator = HeadingCalculator::new(
-            embedded_hal_bus::i2c::RefCellDevice::new(i2c_refcell),
+            embedded_hal_bus::i2c::CriticalSectionDevice::new(i2c_refcell),
             delay,
         );
         heading_calculator.reset();
