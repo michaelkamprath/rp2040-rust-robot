@@ -371,7 +371,7 @@ where
     /// Returns a duty value normalized to the max duty of the motor.
     /// The duty is clamped to the range [0, 1].
     fn noramlize_duty(&self, duty: f32) -> u16 {
-        (duty.max(0.0).min(1.0) * self.motors.enable_pin_a().get_max_duty() as f32) as u16
+        (duty.clamp(0.0, 1.0) * self.motors.enable_pin_a().get_max_duty() as f32) as u16
     }
 
     /// returns true if the button 1 is newly pressed

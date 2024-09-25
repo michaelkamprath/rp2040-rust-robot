@@ -66,8 +66,8 @@ where
     ///
     /// * `f` - The `defmt::Formatter` object that the graph should be printed to.
     /// * `value` - A function that gets called on each row in the data table to determine the value from that row to plot.
-    /// This function must take a reference to the row type and return an `i32`. The mapping of the desired
-    /// row value to the `i32` is for display purposes.
+    ///             This function must take a reference to the row type and return an `i32`. The mapping of the desired
+    ///             row value to the `i32` is for display purposes.
     pub fn plot(&self, f: &mut defmt::Formatter<'_>, value: fn(&T) -> i32) {
         // first we need to scan through the data to find the range of
         // values that we need to plot

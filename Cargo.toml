@@ -24,7 +24,7 @@ micromath = { version = "2.1", features = ["vector"] }
 mpu6050 = { git = "https://github.com/michaelkamprath/mpu6050.git", branch = "micromath", features = [
     "defmt",
 ] }
-embedded-alloc = "0.5"
+embedded-alloc = "0.6"
 adafruit-lcd-backpack = { version = "0.1", features = ["defmt"] }
 ini_core = "0.2"
 

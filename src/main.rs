@@ -27,7 +27,7 @@ use rp_pico as bsp;
 
 extern crate alloc;
 
-use embedded_alloc::Heap;
+use embedded_alloc::TlsfHeap as Heap;
 
 #[global_allocator]
 static HEAP: Heap = Heap::empty();
