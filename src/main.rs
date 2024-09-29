@@ -94,6 +94,7 @@ fn main() -> ! {
     // Configure two pins as being I²C, not GPIO
     let sda_pin: Pin<_, FunctionI2C, PullUp> = pins.gpio4.reconfigure();
     let scl_pin: Pin<_, FunctionI2C, PullUp> = pins.gpio5.reconfigure();
+
     // set up I2C
     let i2c = bsp::hal::I2C::new_controller(
         pac.I2C0,
