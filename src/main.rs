@@ -17,7 +17,7 @@ use panic_probe as _;
 use rp2040_hal::{
     gpio::{
         bank0::{Gpio0, Gpio2, Gpio3},
-        FunctionSpi, PullDown,
+        FunctionI2C, FunctionSpi, Pin, PullDown, PullUp,
     },
     pac::SPI0,
 };
@@ -100,11 +100,14 @@ fn main() -> ! {
     channel_a.output_to(pins.gpio8);
     channel_b.output_to(pins.gpio9);
 
+    // Configure two pins as being I²C, not GPIO
+    let sda_pin: Pin<_, FunctionI2C, PullUp> = pins.gpio4.reconfigure();
+    let scl_pin: Pin<_, FunctionI2C, PullUp> = pins.gpio5.reconfigure();
     // set up I2C
     let i2c = bsp::hal::I2C::new_controller(
         pac.I2C0,
-        pins.gpio4.into_function::<gpio::FunctionI2c>(),
-        pins.gpio5.into_function::<gpio::FunctionI2c>(),
+        sda_pin,
+        scl_pin,
         HertzU32::from_raw(400_000),
         &mut pac.RESETS,
         clocks.system_clock.freq(),
