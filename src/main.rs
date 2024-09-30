@@ -8,7 +8,6 @@ mod system;
 use core::cell::RefCell;
 use defmt::{error, info, panic};
 use defmt_rtt as _;
-use embedded_alloc::LlffHeap as Heap;
 use panic_probe as _;
 
 // Provide an alias for our BSP so we can switch targets quickly.
@@ -31,7 +30,6 @@ use bsp::{
 use driver::Driver;
 use system::millis::init_millis;
 extern crate alloc;
-
 
 use embedded_alloc::TlsfHeap as Heap;
 #[global_allocator]
