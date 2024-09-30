@@ -1,5 +1,5 @@
-use embedded_hal::digital::v2::OutputPin;
-use embedded_hal::PwmPin;
+use embedded_hal::digital::OutputPin;
+use embedded_hal::pwm::SetDutyCycle;
 
 /// A L298N motor controller that can control two motors.
 pub struct MotorController<INA1, INA2, INB1, INB2, ENA, ENB> {
@@ -9,6 +9,8 @@ pub struct MotorController<INA1, INA2, INB1, INB2, ENA, ENB> {
     inb2: INB2,
     ena: ENA,
     enb: ENB,
+    duty_a: u8,
+    duty_b: u8,
 }
 
 #[allow(dead_code)]
@@ -18,8 +20,8 @@ where
     INA2: OutputPin,
     INB1: OutputPin,
     INB2: OutputPin,
-    ENA: PwmPin,
-    ENB: PwmPin,
+    ENA: SetDutyCycle,
+    ENB: SetDutyCycle,
 {
     pub fn new(ina1: INA1, ina2: INA2, inb1: INB1, inb2: INB2, ena: ENA, enb: ENB) -> Self
     where
@@ -27,8 +29,8 @@ where
         INA2: OutputPin,
         INB1: OutputPin,
         INB2: OutputPin,
-        ENA: PwmPin,
-        ENB: PwmPin,
+        ENA: SetDutyCycle,
+        ENB: SetDutyCycle,
     {
         Self {
             ina1,
@@ -37,36 +39,61 @@ where
             inb2,
             ena,
             enb,
+            duty_a: 0,
+            duty_b: 0,
         }
     }
 
-    pub fn enable_pin_a(&self) -> &ENA {
-        &self.ena
+    // pub fn enable_pin_a(&self) -> &ENA {
+    //     &self.ena
+    // }
+
+    // pub fn enable_pin_b(&self) -> &ENB {
+    //     &self.enb
+    // }
+
+    pub fn set_duty(&mut self, duty_percent_a: u8, duty_percent_b: u8) {
+        self.set_duty_a(duty_percent_a);
+        self.set_duty_b(duty_percent_b);
     }
 
-    pub fn enable_pin_b(&self) -> &ENB {
-        &self.enb
+    pub fn set_duty_a(&mut self, duty_percent_a: u8) {
+        self.duty_a = duty_percent_a;
+        if self.duty_a > 100 {
+            self.duty_a = 100;
+        }
     }
 
-    pub fn set_duty(&mut self, duty_a: ENA::Duty, duty_b: ENB::Duty) {
-        self.ena.set_duty(duty_a);
-        self.enb.set_duty(duty_b);
+    pub fn get_duty_percent_a(&self) -> u8 {
+        self.duty_a
     }
 
-    pub fn set_duty_a(&mut self, duty: ENA::Duty) {
-        self.ena.set_duty(duty);
+    pub fn enable_a(&mut self) {
+        let _ = self.ena.set_duty_cycle_percent(self.duty_a);
     }
 
-    pub fn set_duty_b(&mut self, duty: ENB::Duty) {
-        self.enb.set_duty(duty);
+    pub fn disable_a(&mut self) {
+        let _ = self.ena.set_duty_cycle_percent(0);
     }
 
-    pub fn get_duty_a(&self) -> ENA::Duty {
-        self.ena.get_duty()
+    pub fn set_duty_b(&mut self, duty_percent_b: u8) {
+        self.duty_b = duty_percent_b;
+        if self.duty_b > 100 {
+            self.duty_b = 100;
+        }
+        let _ = self.enb.set_duty_cycle_percent(self.duty_b);
     }
 
-    pub fn get_duty_b(&self) -> ENB::Duty {
-        self.enb.get_duty()
+    pub fn get_duty_percent_b(&self) -> u8 {
+        self.duty_b
+    }
+
+    pub fn enable_b(&mut self) {
+        let _ = self.enb.set_duty_cycle_percent(self.duty_b);
+    }
+
+    pub fn disable_b(&mut self) {
+        let _ = self.enb.set_duty_cycle_percent(0);
     }
 
     pub fn forward(&mut self) {
@@ -74,20 +101,20 @@ where
         self.ina2.set_low().ok();
         self.inb1.set_high().ok();
         self.inb2.set_low().ok();
-        self.ena.enable();
-        self.enb.enable();
+        self.enable_a();
+        self.enable_b();
     }
 
     pub fn forward_a(&mut self) {
         self.ina1.set_high().ok();
         self.ina2.set_low().ok();
-        self.ena.enable();
+        self.enable_a();
     }
 
     pub fn forward_b(&mut self) {
         self.inb1.set_high().ok();
         self.inb2.set_low().ok();
-        self.enb.enable();
+        self.enable_b();
     }
 
     pub fn reverse(&mut self) {
@@ -95,25 +122,25 @@ where
         self.ina2.set_high().ok();
         self.inb1.set_low().ok();
         self.inb2.set_high().ok();
-        self.ena.enable();
-        self.enb.enable();
+        self.enable_a();
+        self.enable_b();
     }
 
     pub fn reverse_a(&mut self) {
         self.ina1.set_low().ok();
         self.ina2.set_high().ok();
-        self.ena.enable();
+        self.enable_a();
     }
 
     pub fn reverse_b(&mut self) {
         self.inb1.set_low().ok();
         self.inb2.set_high().ok();
-        self.enb.enable();
+        self.enable_b();
     }
 
     pub fn stop(&mut self) {
-        self.ena.disable();
-        self.enb.disable();
+        self.disable_a();
+        self.disable_b();
         self.ina1.set_low().ok();
         self.ina2.set_low().ok();
         self.inb1.set_low().ok();
@@ -121,13 +148,13 @@ where
     }
 
     pub fn stop_a(&mut self) {
-        self.ena.disable();
+        self.disable_a();
         self.ina1.set_low().ok();
         self.ina2.set_low().ok();
     }
 
     pub fn stop_b(&mut self) {
-        self.enb.disable();
+        self.disable_b();
         self.inb1.set_low().ok();
         self.inb2.set_low().ok();
     }

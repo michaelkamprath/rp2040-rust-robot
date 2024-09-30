@@ -3,8 +3,8 @@ pub struct StraightTelemetryRow {
     time: u32,
     left_wheel_ticks: u32,
     right_wheel_ticks: u32,
-    left_motor_power: f32,
-    right_motor_power: f32,
+    left_motor_power: u8,
+    right_motor_power: u8,
     heading: f32,
     control_signal: f32,
 }
@@ -28,8 +28,8 @@ impl StraightTelemetryRow {
         time: u32,
         left_wheel_ticks: u32,
         right_wheel_ticks: u32,
-        left_motor_power: f32,
-        right_motor_power: f32,
+        left_motor_power: u8,
+        right_motor_power: u8,
         heading: f32,
         control_signal: f32,
     ) -> Self {

@@ -1,6 +1,6 @@
 use crate::system::millis::millis;
 use defmt::trace;
-use embedded_hal::digital::v2::InputPin;
+use embedded_hal::digital::InputPin;
 
 /// A debounced button. The button is considered pressed when the pin is equal to the level indicated by `ACTIVE`.
 /// `ACTIVE` being true indicates the button is active HIGH, and false indicates active LOW. A debounce

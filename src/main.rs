@@ -5,44 +5,35 @@ mod model;
 mod robot;
 mod system;
 
-use bsp::{
-    entry,
-    hal::{fugit::HertzU32, gpio},
-};
+use core::cell::RefCell;
 use defmt::{error, info, panic};
 use defmt_rtt as _;
 use panic_probe as _;
-use rp2040_hal::{
-    gpio::{
-        bank0::{Gpio0, Gpio2, Gpio3, Gpio4, Gpio5},
-        FunctionI2c, FunctionSpi, Pin, PullDown,
-    },
-    pac::{I2C0, SPI0},
-};
 
 // Provide an alias for our BSP so we can switch targets quickly.
 // Uncomment the BSP you included in Cargo.toml, the rest of the code does not need to change.
 use rp_pico as bsp;
 // use sparkfun_pro_micro_rp2040 as bsp;
-
+use crate::robot::Robot;
+use bsp::{
+    entry,
+    hal::fugit::HertzU32,
+    hal::{
+        clocks::{init_clocks_and_plls, Clock},
+        gpio::{FunctionI2C, Pin, PullUp},
+        pac,
+        pwm::Slices,
+        sio::Sio,
+        watchdog::Watchdog,
+    },
+};
+use driver::Driver;
+use system::millis::init_millis;
 extern crate alloc;
 
 use embedded_alloc::TlsfHeap as Heap;
-
 #[global_allocator]
 static HEAP: Heap = Heap::empty();
-
-use bsp::hal::{
-    clocks::{init_clocks_and_plls, Clock},
-    pac,
-    pwm::Slices,
-    sio::Sio,
-    watchdog::Watchdog,
-};
-
-use driver::Driver;
-use robot::Robot;
-use system::millis::init_millis;
 
 #[entry]
 fn main() -> ! {
@@ -100,35 +91,43 @@ fn main() -> ! {
     channel_a.output_to(pins.gpio8);
     channel_b.output_to(pins.gpio9);
 
+    // Configure two pins as being I²C, not GPIO
+    let sda_pin: Pin<_, FunctionI2C, PullUp> = pins.gpio4.reconfigure();
+    let scl_pin: Pin<_, FunctionI2C, PullUp> = pins.gpio5.reconfigure();
     // set up I2C
     let i2c = bsp::hal::I2C::new_controller(
         pac.I2C0,
-        pins.gpio4.into_function::<gpio::FunctionI2c>(),
-        pins.gpio5.into_function::<gpio::FunctionI2c>(),
+        sda_pin,
+        scl_pin,
         HertzU32::from_raw(400_000),
         &mut pac.RESETS,
         clocks.system_clock.freq(),
     );
-    let i2c_manager: &'static _ = shared_bus::new_cortexm!(rp2040_hal::I2C<I2C0, (Pin<Gpio4, FunctionI2c, PullDown>, Pin<Gpio5, FunctionI2c, PullDown>)> = i2c).unwrap();
+    let i2c_ref_cell = RefCell::new(i2c);
+    let i2c_mutex = critical_section::Mutex::new(i2c_ref_cell);
 
     // set up SPI
     #[allow(clippy::type_complexity)]
-    let spi: rp_pico::hal::Spi<
-        rp_pico::hal::spi::Disabled,
-        SPI0,
-        (
-            rp_pico::hal::gpio::Pin<Gpio3, FunctionSpi, PullDown>,
-            rp_pico::hal::gpio::Pin<Gpio0, FunctionSpi, PullDown>,
-            rp_pico::hal::gpio::Pin<Gpio2, FunctionSpi, PullDown>,
-        ),
-    > = bsp::hal::Spi::new(
-        pac.SPI0,
-        (
-            pins.gpio3.into_function::<gpio::FunctionSpi>(),
-            pins.gpio0.into_function::<gpio::FunctionSpi>(),
-            pins.gpio2.into_function::<gpio::FunctionSpi>(),
-        ),
-    );
+    // let spi: rp_pico::hal::Spi<
+    //     rp_pico::hal::spi::Disabled,
+    //     SPI0,
+    //     (
+    //         rp_pico::hal::gpio::Pin<Gpio3, FunctionSpi, PullDown>,
+    //         rp_pico::hal::gpio::Pin<Gpio0, FunctionSpi, PullDown>,
+    //         rp_pico::hal::gpio::Pin<Gpio2, FunctionSpi, PullDown>,
+    //     ),
+    // > = bsp::hal::Spi::new(
+    //     pac.SPI0,
+    //     (
+    //         pins.gpio3.into_function::<gpio::FunctionSpi>(),
+    //         pins.gpio0.into_function::<gpio::FunctionSpi>(),
+    //         pins.gpio2.into_function::<gpio::FunctionSpi>(),
+    //     ),
+    // );
+    let spi_mosi = pins.gpio3.into_function::<bsp::hal::gpio::FunctionSpi>();
+    let spi_miso = pins.gpio0.into_function::<bsp::hal::gpio::FunctionSpi>();
+    let spi_sclk = pins.gpio2.into_function::<bsp::hal::gpio::FunctionSpi>();
+    let spi = bsp::hal::spi::Spi::<_, _, _, 8>::new(pac.SPI0, (spi_mosi, spi_miso, spi_sclk));
 
     // Exchange the uninitialised SPI driver for an initialised one
     let spi = spi.init(
@@ -139,16 +138,19 @@ fn main() -> ! {
     );
 
     let sd = crate::robot::file_storage::FileStorage::new(
-        spi,
-        pins.gpio1.into_push_pull_output(),
+        crate::robot::file_storage::sd_card_spi_device::SDCardSPIDevice::new(
+            spi,
+            pins.gpio1.into_push_pull_output(),
+            timer,
+        ),
         timer,
     );
 
     // If SD card is successfully initialized, we can increase the SPI speed
     match sd.spi(|spi| {
-        spi.set_baudrate(
+        spi.bus.set_baudrate(
             clocks.peripheral_clock.freq(),
-            HertzU32::from_raw(20_000_000),
+            HertzU32::from_raw(16_000_000),
         )
     }) {
         Some(speed) => {
@@ -168,7 +170,7 @@ fn main() -> ! {
         channel_b,
         pins.gpio14.into_pull_up_input(),
         pins.gpio15.into_pull_up_input(),
-        i2c_manager,
+        &i2c_mutex,
         pins.gpio21.into_pull_up_input(),
         pins.gpio20.into_pull_up_input(),
         sd,

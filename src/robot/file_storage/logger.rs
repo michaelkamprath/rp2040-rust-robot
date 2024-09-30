@@ -4,7 +4,7 @@ use alloc::{
     vec,
 };
 use defmt::{debug, error, info, warn};
-use embedded_hal::{blocking::delay::DelayUs, digital::v2::OutputPin};
+use embedded_hal::{delay::DelayNs, spi::SpiDevice};
 use embedded_sdmmc::SdCardError;
 
 use super::{sd_file::SDFile, FileStorage};
@@ -15,28 +15,22 @@ use super::{sd_file::SDFile, FileStorage};
 const LOG_DIR_NAME: &str = "log";
 const LOG_INDEX_FILE_NAME: &str = "index.txt";
 
-pub struct Logger<SPI, CS, DELAY, const BUFSIZE: usize>
+pub struct Logger<SPI_DEV, DELAY, const BUFSIZE: usize>
 where
-    SPI: embedded_hal::blocking::spi::Transfer<u8> + embedded_hal::blocking::spi::Write<u8>,
-    <SPI as embedded_hal::blocking::spi::Transfer<u8>>::Error: core::fmt::Debug,
-    <SPI as embedded_hal::blocking::spi::Write<u8>>::Error: core::fmt::Debug,
-    CS: OutputPin,
-    DELAY: DelayUs<u8>,
+    SPI_DEV: SpiDevice<u8>,
+    DELAY: DelayNs,
 {
-    log_file: Option<SDFile<SPI, CS, DELAY>>,
+    log_file: Option<SDFile<SPI_DEV, DELAY>>,
     buffer: [u8; BUFSIZE],
     buffer_index: usize,
 }
 
-impl<SPI, CS, DELAY, const BUFSIZE: usize> Logger<SPI, CS, DELAY, BUFSIZE>
+impl<SPI_DEV, DELAY, const BUFSIZE: usize> Logger<SPI_DEV, DELAY, BUFSIZE>
 where
-    SPI: embedded_hal::blocking::spi::Transfer<u8> + embedded_hal::blocking::spi::Write<u8>,
-    <SPI as embedded_hal::blocking::spi::Transfer<u8>>::Error: core::fmt::Debug,
-    <SPI as embedded_hal::blocking::spi::Write<u8>>::Error: core::fmt::Debug,
-    CS: OutputPin,
-    DELAY: DelayUs<u8>,
+    SPI_DEV: SpiDevice<u8>,
+    DELAY: DelayNs,
 {
-    pub fn new(log_file: Option<SDFile<SPI, CS, DELAY>>) -> Self {
+    pub fn new(log_file: Option<SDFile<SPI_DEV, DELAY>>) -> Self {
         Self {
             log_file,
             buffer: [0u8; BUFSIZE],
@@ -46,8 +40,8 @@ where
 
     /// Initializes the log file and log file index
     pub fn init_log_file(
-        sdcard: &mut FileStorage<SPI, CS, DELAY>,
-    ) -> Option<SDFile<SPI, CS, DELAY>> {
+        sdcard: &mut FileStorage<SPI_DEV, DELAY>,
+    ) -> Option<SDFile<SPI_DEV, DELAY>> {
         // open log directory
         let root_dir = match sdcard.root_dir() {
             Some(dir) => dir,
@@ -208,13 +202,10 @@ where
     }
 }
 /// Implement the `core::fmt::Write` trait for the logger
-impl<SPI, CS, DELAY, const BUFSIZE: usize> core::fmt::Write for Logger<SPI, CS, DELAY, BUFSIZE>
+impl<SPI_DEV, DELAY, const BUFSIZE: usize> core::fmt::Write for Logger<SPI_DEV, DELAY, BUFSIZE>
 where
-    SPI: embedded_hal::blocking::spi::Transfer<u8> + embedded_hal::blocking::spi::Write<u8>,
-    <SPI as embedded_hal::blocking::spi::Transfer<u8>>::Error: core::fmt::Debug,
-    <SPI as embedded_hal::blocking::spi::Write<u8>>::Error: core::fmt::Debug,
-    CS: OutputPin,
-    DELAY: DelayUs<u8>,
+    SPI_DEV: SpiDevice<u8>,
+    DELAY: DelayNs,
 {
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
         self.write_to_buffer(s).map_err(|_| core::fmt::Error)?;

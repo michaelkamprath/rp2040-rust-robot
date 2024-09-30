@@ -4,10 +4,7 @@ use crate::system::millis::millis;
 use core::marker::PhantomData;
 
 use defmt::{error, info};
-use embedded_hal::blocking::{
-    delay::DelayMs,
-    i2c::{Write, WriteRead},
-};
+use embedded_hal::{delay::DelayNs, i2c::I2c};
 use micromath::vector::Vector3d;
 use mpu6050::Mpu6050;
 
@@ -24,55 +21,68 @@ pub struct HeadingCalculator<TWI, DELAY> {
     gyro: Mpu6050<TWI>,
     last_update_rate: f32,
     last_update_millis: u32,
+    inited: bool,
     _delay: PhantomData<DELAY>,
 }
 
 #[allow(dead_code, non_camel_case_types)]
-impl<TWI, TWI_ERR, DELAY> HeadingCalculator<TWI, DELAY>
+impl<TWI, DELAY> HeadingCalculator<TWI, DELAY>
 where
-    TWI: Write<Error = TWI_ERR> + WriteRead<Error = TWI_ERR>,
-    DELAY: DelayMs<u8>,
-    TWI_ERR: defmt::Format,
+    TWI: I2c,
+    DELAY: DelayNs,
 {
     pub fn new(i2c: TWI, delay: &mut DELAY) -> Self {
         let mut gyro = Mpu6050::new(i2c);
+        let mut inited = false;
         match gyro.init(delay) {
             Ok(_) => {
                 info!("Gyro initialized");
+                inited = true;
             }
-            Err(e) => {
-                error!("Error initializing gyro: {}", e);
+            Err(_e) => {
+                error!("Error initializing gyro");
             }
         };
-        if let Err(_error) = gyro.set_gyro_range(mpu6050::device::GyroRange::D250) {
-            error!("Error setting gyro range");
+        if inited {
+            if let Err(_error) = gyro.set_gyro_range(mpu6050::device::GyroRange::D250) {
+                error!("Error setting gyro range");
+            }
+
+            let cur_offsets = match gyro.get_gyro_offsets() {
+                Ok(offsets) => offsets,
+                Err(_error) => {
+                    error!("Error getting gyro offsets");
+                    Vector3d::<i32>::default()
+                }
+            };
+
+            info!(
+                "Got gyro offsets: x = {}, y = {}, z = {}",
+                cur_offsets.x, cur_offsets.y, cur_offsets.z
+            );
         }
-
-        let cur_offsets = match gyro.get_gyro_offsets() {
-            Ok(offsets) => offsets,
-            Err(error) => {
-                error!("Error getting gyro offsets: {}", error);
-                Vector3d::<i32>::default()
-            }
-        };
-
-        info!(
-            "Got gyro offsets: x = {}, y = {}, z = {}",
-            cur_offsets.x, cur_offsets.y, cur_offsets.z
-        );
 
         Self {
             heading: 0.0,
             gyro,
             last_update_rate: 0.0,
             last_update_millis: millis(),
+            inited,
             _delay: PhantomData,
         }
     }
 
+    pub fn is_inited(&self) -> bool {
+        self.inited
+    }
+
     pub fn calibrate<F: FnMut(usize)>(&mut self, delay: &mut DELAY, callback: F) {
-        if let Err(e) = self.gyro.calibrate_gyro(delay, callback) {
-            error!("Error calibrating gyro: {}", e);
+        if !self.is_inited() {
+            error!("Gyro not initialized");
+            return;
+        }
+        if let Err(_e) = self.gyro.calibrate_gyro(delay, callback) {
+            error!("Error calibrating gyro");
         }
     }
 
@@ -83,6 +93,9 @@ where
     }
 
     pub fn update(&mut self) -> f32 {
+        if !self.is_inited() {
+            return 0.0;
+        }
         let now = millis();
         let delta_time = now - self.last_update_millis;
         if delta_time >= HEADING_UPDATE_INTERVAL_MS {
@@ -100,8 +113,8 @@ where
                         self.heading += 360.0;
                     }
                 }
-                Err(error) => {
-                    error!("Error reading gyro: {}", error);
+                Err(_error) => {
+                    error!("Error reading gyro");
                 }
             }
         }
