@@ -32,6 +32,8 @@ use driver::Driver;
 use system::millis::init_millis;
 extern crate alloc;
 
+
+use embedded_alloc::TlsfHeap as Heap;
 #[global_allocator]
 static HEAP: Heap = Heap::empty();
 
