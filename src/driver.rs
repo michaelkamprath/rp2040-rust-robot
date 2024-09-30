@@ -218,7 +218,12 @@ impl<
         // - button one will select the current function and execute it
         // - if no button is pressed for the idle wait time, return to idle state
 
-        const FUNCTIONS: [&str; 3] = ["Select Path", "Calibrate Gyro", "Heading Display"];
+        const FUNCTIONS: [&str; 4] = [
+            "Select Path",
+            "Calibrate Gyro",
+            "Heading Display",
+            "Drive Straight",
+        ];
         let mut function_idx: usize = 0;
         let mut last_interaction_millis = millis();
         self.robot.clear_display_reset_timer();
@@ -271,6 +276,10 @@ impl<
                     2 => {
                         self.robot.display_heading().ok();
                         self.robot.set_display_to_idle();
+                    }
+                    3 => {
+                        self.robot.straight(1500, true);
+                        self.robot.start_display_reset_timer();
                     }
                     _ => {
                         warn!("handle_functions_menu: invalid function index");
