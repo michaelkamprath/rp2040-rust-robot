@@ -109,22 +109,6 @@ fn main() -> ! {
 
     // set up SPI
     #[allow(clippy::type_complexity)]
-    // let spi: rp_pico::hal::Spi<
-    //     rp_pico::hal::spi::Disabled,
-    //     SPI0,
-    //     (
-    //         rp_pico::hal::gpio::Pin<Gpio3, FunctionSpi, PullDown>,
-    //         rp_pico::hal::gpio::Pin<Gpio0, FunctionSpi, PullDown>,
-    //         rp_pico::hal::gpio::Pin<Gpio2, FunctionSpi, PullDown>,
-    //     ),
-    // > = bsp::hal::Spi::new(
-    //     pac.SPI0,
-    //     (
-    //         pins.gpio3.into_function::<gpio::FunctionSpi>(),
-    //         pins.gpio0.into_function::<gpio::FunctionSpi>(),
-    //         pins.gpio2.into_function::<gpio::FunctionSpi>(),
-    //     ),
-    // );
     let spi_mosi = pins.gpio3.into_function::<bsp::hal::gpio::FunctionSpi>();
     let spi_miso = pins.gpio0.into_function::<bsp::hal::gpio::FunctionSpi>();
     let spi_sclk = pins.gpio2.into_function::<bsp::hal::gpio::FunctionSpi>();

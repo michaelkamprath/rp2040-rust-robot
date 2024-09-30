@@ -218,11 +218,13 @@ impl<
         // - button one will select the current function and execute it
         // - if no button is pressed for the idle wait time, return to idle state
 
-        const FUNCTIONS: [&str; 4] = [
+        const FUNCTIONS: [&str; 6] = [
             "Select Path",
             "Calibrate Gyro",
             "Heading Display",
             "Drive Straight",
+            "Turn Left",
+            "Turn Right",
         ];
         let mut function_idx: usize = 0;
         let mut last_interaction_millis = millis();
@@ -278,7 +280,33 @@ impl<
                         self.robot.set_display_to_idle();
                     }
                     3 => {
+                        write!(
+                            self.robot.clear_lcd().set_lcd_cursor(0, 0),
+                            "Driving straight",
+                        )
+                        .ok();
+                        self.delay.delay_ms(500);
                         self.robot.straight(1500, true);
+                        self.robot.start_display_reset_timer();
+                    }
+                    4 => {
+                        write!(
+                            self.robot.clear_lcd().set_lcd_cursor(0, 0),
+                            "Turning left   \x7F",
+                        )
+                        .ok();
+                        self.delay.delay_ms(500);
+                        self.robot.turn(90);
+                        self.robot.start_display_reset_timer();
+                    }
+                    5 => {
+                        write!(
+                            self.robot.clear_lcd().set_lcd_cursor(0, 0),
+                            "Turning right  \x7E",
+                        )
+                        .ok();
+                        self.delay.delay_ms(500);
+                        self.robot.turn(-90);
                         self.robot.start_display_reset_timer();
                     }
                     _ => {

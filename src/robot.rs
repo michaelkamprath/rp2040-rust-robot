@@ -570,6 +570,7 @@ where
         1.0
     }
 
+    /// Turns the robot by a specified angle in degrees. Positive angle is a left turn, negative angle is a right turn
     pub fn turn(&mut self, angle_degrees: i32) -> &mut Self {
         const TURN_MIN_POWER: f32 = 0.50;
         if angle_degrees.abs() < self.min_turn_angle() as i32 {
