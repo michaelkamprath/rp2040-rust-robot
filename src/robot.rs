@@ -16,7 +16,6 @@ use crate::{
     },
     system::millis::millis,
 };
-use adafruit_lcd_backpack::{LcdBackpack, LcdDisplayType};
 use alloc::{
     string::{String, ToString},
     vec,
@@ -35,6 +34,8 @@ use embedded_hal::{
     pwm::SetDutyCycle,
     spi::SpiDevice,
 };
+use embedded_hal_bus::i2c::CriticalSectionDevice;
+use i2c_character_display::{AdafruitLCDBackpack, LcdDisplayType};
 use micromath::F32Ext;
 use rp_pico::hal::gpio;
 use rp_pico::hal::{
@@ -110,7 +111,7 @@ pub struct Robot<
     button2: DebouncedButton<BUTT2, false, BUTTON_DEBOUNCE_TIME_MS>,
     pub heading_calculator:
         HeadingCalculator<embedded_hal_bus::i2c::CriticalSectionDevice<'a, TWI>, DELAY>,
-    lcd: LcdBackpack<embedded_hal_bus::i2c::CriticalSectionDevice<'a, TWI>, DELAY>,
+    lcd: AdafruitLCDBackpack<CriticalSectionDevice<'a, TWI>, DELAY>,
     pub sd_card: FileStorage<SPI_DEV, DELAY>,
     reset_display_start_millis: u32,
     log_index: u32,
@@ -174,7 +175,7 @@ where
 
         // let i2c_device = embedded_hal_bus::i2c::RefCellDevice::new(i2c_refcell);
         let i2c_device = embedded_hal_bus::i2c::CriticalSectionDevice::new(i2c_refcell);
-        let mut lcd = LcdBackpack::new(LcdDisplayType::Lcd16x2, i2c_device, delay.clone());
+        let mut lcd = AdafruitLCDBackpack::new(i2c_device, LcdDisplayType::Lcd16x2, delay.clone());
         match lcd.init() {
             Ok(_) => {
                 info!("LCD initialized");
@@ -206,8 +207,8 @@ where
         debug!("Writing to LCD first message");
         if let Err(_e) = lcd
             .home()
-            .and_then(LcdBackpack::clear)
-            .and_then(|lcd| LcdBackpack::print(lcd, "Calibrating Gyro"))
+            .and_then(AdafruitLCDBackpack::clear)
+            .and_then(|lcd| AdafruitLCDBackpack::print(lcd, "Calibrating Gyro"))
         {
             error!("Error writing to LCD");
         }
@@ -220,15 +221,15 @@ where
 
         if let Err(_e) = lcd
             .home()
-            .and_then(LcdBackpack::clear)
-            .and_then(|lcd| LcdBackpack::print(lcd, "Robot Started"))
+            .and_then(AdafruitLCDBackpack::clear)
+            .and_then(|lcd| AdafruitLCDBackpack::print(lcd, "Robot Started"))
             .and_then(|lcd| {
                 write!(
                     lcd.set_cursor(0, 1)?,
                     "SD: {} GB",
                     sd_card.volume_size().unwrap_or(0) / 1_073_741_824
                 )
-                .map_err(|_e| adafruit_lcd_backpack::BackpackError::FormattingError)
+                .map_err(i2c_character_display::Error::FormattingError)
             })
         {
             error!("Error writing to LCD");
@@ -679,7 +680,7 @@ where
     //--------------------------------------------------------------------------
     pub fn display_heading(
         &mut self,
-    ) -> Result<(), adafruit_lcd_backpack::BackpackError<TWI::Error>> {
+    ) -> Result<(), i2c_character_display::Error<CriticalSectionDevice<'a, TWI>>> {
         write!(self.lcd.clear()?.set_cursor(0, 0)?, "Heading:").ok();
         self.heading_calculator.reset();
         let mut continue_loop = true;

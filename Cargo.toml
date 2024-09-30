@@ -26,7 +26,7 @@ mpu6050 = { git = "https://github.com/michaelkamprath/mpu6050.git", branch = "mi
     "defmt",
 ] }
 embedded-alloc = "0.6"
-adafruit-lcd-backpack = { version = "0.2", features = ["defmt"] }
+i2c-character-display = { version = "0.1", features = ["defmt"] }
 ini_core = "0.2"
 
 # We're using a Pico by default on this template
@@ -99,6 +99,5 @@ opt-level = 3
 mpu6050 = { path = "../mpu6050" }
 
 [patch.crates-io]
-adafruit-lcd-backpack = { path = "../adafruit-lcd-backpack-rust" }
 mcp230xx = { path = "../mcp230xx" }
 shared-bus = { path = "../shared-bus" }
