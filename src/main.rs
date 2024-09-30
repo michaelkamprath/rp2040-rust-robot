@@ -5,44 +5,35 @@ mod model;
 mod robot;
 mod system;
 
-use bsp::{
-    entry,
-    hal::{fugit::HertzU32, gpio},
-};
 use core::cell::RefCell;
 use defmt::{error, info, panic};
 use defmt_rtt as _;
 use embedded_alloc::LlffHeap as Heap;
 use panic_probe as _;
-use rp2040_hal::{
-    gpio::{
-        bank0::{Gpio0, Gpio2, Gpio3},
-        FunctionI2C, FunctionSpi, Pin, PullDown, PullUp,
-    },
-    pac::SPI0,
-};
 
 // Provide an alias for our BSP so we can switch targets quickly.
 // Uncomment the BSP you included in Cargo.toml, the rest of the code does not need to change.
 use rp_pico as bsp;
 // use sparkfun_pro_micro_rp2040 as bsp;
-
+use crate::robot::Robot;
+use bsp::{
+    entry,
+    hal::fugit::HertzU32,
+    hal::{
+        clocks::{init_clocks_and_plls, Clock},
+        gpio::{FunctionI2C, Pin, PullUp},
+        pac,
+        pwm::Slices,
+        sio::Sio,
+        watchdog::Watchdog,
+    },
+};
+use driver::Driver;
+use system::millis::init_millis;
 extern crate alloc;
 
 #[global_allocator]
 static HEAP: Heap = Heap::empty();
-
-use bsp::hal::{
-    clocks::{init_clocks_and_plls, Clock},
-    pac,
-    pwm::Slices,
-    sio::Sio,
-    watchdog::Watchdog,
-};
-
-use crate::robot::Robot;
-use driver::Driver;
-use system::millis::init_millis;
 
 #[entry]
 fn main() -> ! {
@@ -117,22 +108,26 @@ fn main() -> ! {
 
     // set up SPI
     #[allow(clippy::type_complexity)]
-    let spi: rp_pico::hal::Spi<
-        rp_pico::hal::spi::Disabled,
-        SPI0,
-        (
-            rp_pico::hal::gpio::Pin<Gpio3, FunctionSpi, PullDown>,
-            rp_pico::hal::gpio::Pin<Gpio0, FunctionSpi, PullDown>,
-            rp_pico::hal::gpio::Pin<Gpio2, FunctionSpi, PullDown>,
-        ),
-    > = bsp::hal::Spi::new(
-        pac.SPI0,
-        (
-            pins.gpio3.into_function::<gpio::FunctionSpi>(),
-            pins.gpio0.into_function::<gpio::FunctionSpi>(),
-            pins.gpio2.into_function::<gpio::FunctionSpi>(),
-        ),
-    );
+    // let spi: rp_pico::hal::Spi<
+    //     rp_pico::hal::spi::Disabled,
+    //     SPI0,
+    //     (
+    //         rp_pico::hal::gpio::Pin<Gpio3, FunctionSpi, PullDown>,
+    //         rp_pico::hal::gpio::Pin<Gpio0, FunctionSpi, PullDown>,
+    //         rp_pico::hal::gpio::Pin<Gpio2, FunctionSpi, PullDown>,
+    //     ),
+    // > = bsp::hal::Spi::new(
+    //     pac.SPI0,
+    //     (
+    //         pins.gpio3.into_function::<gpio::FunctionSpi>(),
+    //         pins.gpio0.into_function::<gpio::FunctionSpi>(),
+    //         pins.gpio2.into_function::<gpio::FunctionSpi>(),
+    //     ),
+    // );
+    let spi_mosi = pins.gpio3.into_function::<bsp::hal::gpio::FunctionSpi>();
+    let spi_miso = pins.gpio0.into_function::<bsp::hal::gpio::FunctionSpi>();
+    let spi_sclk = pins.gpio2.into_function::<bsp::hal::gpio::FunctionSpi>();
+    let spi = bsp::hal::spi::Spi::<_, _, _, 8>::new(pac.SPI0, (spi_mosi, spi_miso, spi_sclk));
 
     // Exchange the uninitialised SPI driver for an initialised one
     let spi = spi.init(
@@ -155,7 +150,7 @@ fn main() -> ! {
     match sd.spi(|spi| {
         spi.bus.set_baudrate(
             clocks.peripheral_clock.freq(),
-            HertzU32::from_raw(20_000_000),
+            HertzU32::from_raw(16_000_000),
         )
     }) {
         Some(speed) => {

@@ -5,7 +5,7 @@ pub mod sd_file;
 
 use alloc::{rc::Rc, string::ToString, vec::Vec};
 use core::cell::RefCell;
-use defmt::{debug, error, info};
+use defmt::{debug, error, info, trace};
 use embedded_hal::{delay::DelayNs, spi::SpiDevice};
 use embedded_sdmmc::{
     DirEntry, Mode, RawDirectory, RawVolume, SdCard, SdCardError, TimeSource, Timestamp, VolumeIdx,
@@ -67,7 +67,7 @@ where
             }
         }
 
-        debug!("Getting Volume 0...");
+        trace!("Getting Volume 0...");
         let volume = match volume_mgr.open_volume(VolumeIdx(0)) {
             Ok(v) => v,
             Err(e) => {

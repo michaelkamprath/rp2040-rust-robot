@@ -36,11 +36,11 @@ rp-pico = "0.9"
 # sparkfun-pro-micro-rp2040 = "0.7"
 
 # If you're not going to use a Board Support Package you'll need these:
-rp2040-hal = { version = "0.10", features = [
-    "rt",
-    "critical-section-impl",
-    "defmt",
-] }
+# rp2040-hal = { version = "0.10", features = [
+#     "rt",
+#     "critical-section-impl",
+#     "defmt",
+# ] }
 # rp2040-boot2 = "0.3"
 
 # cargo build/run
@@ -99,5 +99,3 @@ opt-level = 3
 mpu6050 = { path = "../mpu6050" }
 
 [patch.crates-io]
-mcp230xx = { path = "../mcp230xx" }
-shared-bus = { path = "../shared-bus" }
