@@ -158,4 +158,16 @@ where
         self.inb1.set_low().ok();
         self.inb2.set_low().ok();
     }
+
+    /// Break the motor controller to stop the motors quickly.
+    /// This will set the duty cycle to 100% and set the direction pins to high.
+    /// `stop` should be called after calling `brake` and before calling `forward` to stop the motors.
+    pub fn brake(&mut self) {
+        self.ina1.set_high().ok();
+        self.ina2.set_high().ok();
+        self.inb1.set_high().ok();
+        self.inb2.set_high().ok();
+        let _ = self.ena.set_duty_cycle_percent(100);
+        let _ = self.enb.set_duty_cycle_percent(100);
+    }
 }

@@ -37,7 +37,7 @@ use embedded_hal::{
 use embedded_hal_bus::i2c::CriticalSectionDevice;
 use i2c_character_display::{AdafruitLCDBackpack, LcdDisplayType};
 use micromath::F32Ext;
-use rp_pico::hal::gpio;
+use rp_pico::hal::{gpio, Timer};
 use rp_pico::hal::{
     gpio::{
         bank0::{Gpio20, Gpio21},
@@ -110,14 +110,15 @@ pub struct Robot<
     button1: DebouncedButton<BUTT1, false, BUTTON_DEBOUNCE_TIME_MS>,
     button2: DebouncedButton<BUTT2, false, BUTTON_DEBOUNCE_TIME_MS>,
     pub heading_calculator:
-        HeadingCalculator<embedded_hal_bus::i2c::CriticalSectionDevice<'a, TWI>, DELAY>,
-    lcd: AdafruitLCDBackpack<CriticalSectionDevice<'a, TWI>, DELAY>,
+        HeadingCalculator<embedded_hal_bus::i2c::CriticalSectionDevice<'a, TWI>>,
+    lcd: AdafruitLCDBackpack<CriticalSectionDevice<'a, TWI>, Timer>,
     pub sd_card: FileStorage<SPI_DEV, DELAY>,
     reset_display_start_millis: u32,
     log_index: u32,
     pub logger: Logger<SPI_DEV, DELAY, 128>,
     idle_message_line2: Option<String>,
     config: Config,
+    delay: Timer,
 }
 
 #[allow(dead_code, non_camel_case_types)]
@@ -153,7 +154,7 @@ where
         left_counter_pin: LeftWheelCounterPin,
         right_counter_pin: RightWheelCounterPin,
         mut sd_card: FileStorage<SPI_DEV, DELAY>,
-        delay: &mut DELAY,
+        timer: &mut Timer,
     ) -> Self {
         // create the motor controller
         let motors = MotorController::new(ina1_pin, ina2_pin, inb1_pin, inb2_pin, duty_a, duty_b);
@@ -175,7 +176,7 @@ where
 
         // let i2c_device = embedded_hal_bus::i2c::RefCellDevice::new(i2c_refcell);
         let i2c_device = embedded_hal_bus::i2c::CriticalSectionDevice::new(i2c_refcell);
-        let mut lcd = AdafruitLCDBackpack::new(i2c_device, LcdDisplayType::Lcd16x2, delay.clone());
+        let mut lcd = AdafruitLCDBackpack::new(i2c_device, LcdDisplayType::Lcd16x2, *timer);
         match lcd.init() {
             Ok(_) => {
                 info!("LCD initialized");
@@ -184,6 +185,14 @@ where
                 error!("Error initializing LCD");
             }
         };
+        debug!("Writing to LCD first message");
+        if let Err(_e) = lcd
+            .home()
+            .and_then(AdafruitLCDBackpack::clear)
+            .and_then(|lcd| AdafruitLCDBackpack::print(lcd, "Robot Starting"))
+        {
+            error!("Error writing to LCD");
+        }
 
         debug!("Creating custom character 1");
         if let Err(_e) =
@@ -204,18 +213,9 @@ where
         };
         debug!("LCD characters created");
 
-        debug!("Writing to LCD first message");
-        if let Err(_e) = lcd
-            .home()
-            .and_then(AdafruitLCDBackpack::clear)
-            .and_then(|lcd| AdafruitLCDBackpack::print(lcd, "Calibrating Gyro"))
-        {
-            error!("Error writing to LCD");
-        }
-        delay.delay_ms(5000);
         let mut heading_calculator = HeadingCalculator::new(
             embedded_hal_bus::i2c::CriticalSectionDevice::new(i2c_refcell),
-            delay,
+            timer,
         );
         heading_calculator.reset();
 
@@ -248,6 +248,7 @@ where
             logger,
             idle_message_line2: None,
             config: Config::new(),
+            delay: *timer,
         }
     }
 
@@ -278,6 +279,15 @@ where
                     })?;
                 debug!("Config file contents:\n{}", config_str);
                 self.config.set_config_values(config_str);
+
+                // set the gyro offsets from the config file
+                if self.heading_calculator.is_inited() {
+                    self.heading_calculator.set_gyro_offsets(
+                        self.config.gyro_offset_x,
+                        self.config.gyro_offset_y,
+                        self.config.gyro_offset_z,
+                    );
+                }
             } else {
                 debug!("Config file not found, using defaults");
             }
@@ -532,6 +542,10 @@ where
             }
             self.handle_loop();
         }
+        self.motors.brake();
+        self.delay.delay_ms(100);
+        self.motors.stop();
+        info!("Done with straight movement");
         if let Err(error) = core::write!(
             self.set_lcd_cursor(0, 1),
             "{} {}{} {}/ {}",
@@ -543,8 +557,6 @@ where
         ) {
             error!("Error writing to LCD: {}", error.to_string().as_str());
         }
-        self.motors.stop();
-        info!("Done with straight movement");
 
         writeln!(
             self.logger,
@@ -645,11 +657,9 @@ where
             self.handle_loop();
         }
         let motors_off_heading = self.heading_calculator.heading();
+        self.motors.brake();
+        self.delay.delay_ms(100);
         self.motors.stop();
-        let start_millis = millis();
-        while millis() - start_millis < 1000 {
-            self.handle_loop();
-        }
         current_angle = self.heading_calculator.heading();
         if let Err(error) = core::write!(
             self.clear_lcd().set_lcd_cursor(0, 0),

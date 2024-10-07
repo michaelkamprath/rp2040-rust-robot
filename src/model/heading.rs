@@ -1,7 +1,6 @@
 #![allow(non_camel_case_types)]
 
 use crate::system::millis::millis;
-use core::marker::PhantomData;
 
 use defmt::{error, info};
 use embedded_hal::{delay::DelayNs, i2c::I2c};
@@ -16,25 +15,26 @@ use mpu6050::Mpu6050;
 
 const HEADING_UPDATE_INTERVAL_MS: u32 = 1;
 
-pub struct HeadingCalculator<TWI, DELAY> {
+pub struct HeadingCalculator<TWI> {
     heading: f32,
     gyro: Mpu6050<TWI>,
     last_update_rate: f32,
     last_update_millis: u32,
     inited: bool,
-    _delay: PhantomData<DELAY>,
 }
 
 #[allow(dead_code, non_camel_case_types)]
-impl<TWI, DELAY> HeadingCalculator<TWI, DELAY>
+impl<TWI> HeadingCalculator<TWI>
 where
     TWI: I2c,
-    DELAY: DelayNs,
 {
-    pub fn new(i2c: TWI, delay: &mut DELAY) -> Self {
+    pub fn new<DELAY>(i2c: TWI, timer: &mut DELAY) -> Self
+    where
+        DELAY: DelayNs,
+    {
         let mut gyro = Mpu6050::new(i2c);
         let mut inited = false;
-        match gyro.init(delay) {
+        match gyro.init(timer) {
             Ok(_) => {
                 info!("Gyro initialized");
                 inited = true;
@@ -68,7 +68,6 @@ where
             last_update_rate: 0.0,
             last_update_millis: millis(),
             inited,
-            _delay: PhantomData,
         }
     }
 
@@ -76,7 +75,7 @@ where
         self.inited
     }
 
-    pub fn calibrate<F: FnMut(usize)>(&mut self, delay: &mut DELAY, callback: F) {
+    pub fn calibrate<F: FnMut(usize), DELAY: DelayNs>(&mut self, delay: &mut DELAY, callback: F) {
         if !self.is_inited() {
             error!("Gyro not initialized");
             return;
@@ -84,6 +83,24 @@ where
         if let Err(_e) = self.gyro.calibrate_gyro(delay, callback) {
             error!("Error calibrating gyro");
         }
+    }
+
+    pub fn set_gyro_offsets(&mut self, x_offset: i16, y_offset: i16, z_offset: i16) {
+        if !self.is_inited() {
+            error!("Cannot set gyro offsets before gyro is initialized");
+            return;
+        }
+        if self
+            .gyro
+            .set_gyro_offsets(x_offset, y_offset, z_offset)
+            .is_err()
+        {
+            error!("Error setting gyro offsets");
+        }
+        info!(
+            "Set gyro offsets: x = {}, y = {}, z = {}",
+            x_offset, y_offset, z_offset
+        );
     }
 
     pub fn reset(&mut self) {

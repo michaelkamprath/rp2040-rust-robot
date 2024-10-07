@@ -8,7 +8,6 @@ use embedded_hal::{
 #[derive(Debug)]
 pub enum SDCardSPIDeviceError {
     Spi,
-    Pin,
     Delay,
     ChipSelect, // Add other error variants as needed
 }
@@ -17,11 +16,22 @@ impl embedded_hal::spi::Error for SDCardSPIDeviceError {
     fn kind(&self) -> embedded_hal::spi::ErrorKind {
         match self {
             SDCardSPIDeviceError::Spi => embedded_hal::spi::ErrorKind::Other,
-            SDCardSPIDeviceError::Pin => embedded_hal::spi::ErrorKind::Other,
             SDCardSPIDeviceError::Delay => embedded_hal::spi::ErrorKind::Other,
             SDCardSPIDeviceError::ChipSelect => embedded_hal::spi::ErrorKind::ChipSelectFault,
             // Map other error variants as needed
         }
+    }
+}
+
+impl core::fmt::Display for SDCardSPIDeviceError {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        match self {
+            SDCardSPIDeviceError::Spi => write!(f, "SD Card SPI bus error"),
+            SDCardSPIDeviceError::Delay => write!(f, "SD Card Delay error"),
+            SDCardSPIDeviceError::ChipSelect => write!(f, "SD Card chip select error"),
+            // Map other error variants as needed
+        }?;
+        Ok(())
     }
 }
 
@@ -93,7 +103,7 @@ where
                     Ok(())
                 }
             } {
-                // iff an error accurs, deassert CS pin and return error
+                // if an error occurs, deassert CS pin and return error
                 self.cs.set_high().ok();
                 error!("SDCardSPIDevice::transaction - error");
                 return Err(SDCardSPIDeviceError::Spi);

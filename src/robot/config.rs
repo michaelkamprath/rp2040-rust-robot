@@ -1,5 +1,5 @@
 use alloc::string::{String, ToString};
-use defmt::{debug, info, warn};
+use defmt::{debug, info, trace, warn};
 use ini_core as ini;
 
 const WHEEL_DIAMETER: f32 = 67.0; // mm
@@ -37,6 +37,10 @@ pub struct Config {
     // general configuration
     pub wheel_ticks_per_mm: f32,
     pub idle_message: String,
+    // gyro offsets
+    pub gyro_offset_x: i16,
+    pub gyro_offset_y: i16,
+    pub gyro_offset_z: i16,
 }
 
 impl Config {
@@ -55,6 +59,9 @@ impl Config {
             turn_right_stop_angle_delta: 0,
             wheel_ticks_per_mm: WHEEL_TICKS_PER_MM,
             idle_message: String::from(DEFAULT_IDLE_MESSAGE),
+            gyro_offset_x: 0,
+            gyro_offset_y: 0,
+            gyro_offset_z: 0,
         }
     }
 
@@ -66,7 +73,7 @@ impl Config {
                     debug!("Config section: {}", section);
                 }
                 ini::Item::Property(key, value) => {
-                    debug!("Config key: {}, value: {}", key, value);
+                    trace!("Config key: {}, value: {}", key, value);
                     match key.trim() {
                         "straight_left_power" => {
                             if value.is_some() {
@@ -75,7 +82,7 @@ impl Config {
                                     if self.straight_left_power > 100 {
                                         self.straight_left_power = 100;
                                     }
-                                    info!("CONFIG: left motor power = {}", power);
+                                    trace!("CONFIG: left motor power = {}", power);
                                 }
                             }
                         }
@@ -86,7 +93,7 @@ impl Config {
                                     if self.straight_right_power > 100 {
                                         self.straight_right_power = 100;
                                     }
-                                    info!("CONFIG: right motor power = {}", power);
+                                    trace!("CONFIG: right motor power = {}", power);
                                 }
                             }
                         }
@@ -94,7 +101,7 @@ impl Config {
                             if value.is_some() {
                                 if let Ok(pid_p) = value.unwrap().trim().parse::<f32>() {
                                     self.straight_pid_p = pid_p;
-                                    info!(
+                                    trace!(
                                         "CONFIG: straight PID controller parameter P = {}",
                                         pid_p
                                     );
@@ -105,7 +112,7 @@ impl Config {
                             if value.is_some() {
                                 if let Ok(pid_i) = value.unwrap().trim().parse::<f32>() {
                                     self.straight_pid_i = pid_i;
-                                    info!(
+                                    trace!(
                                         "CONFIG: straight PID controller parameter P = {}",
                                         pid_i
                                     );
@@ -116,7 +123,7 @@ impl Config {
                             if value.is_some() {
                                 if let Ok(pid_d) = value.unwrap().trim().parse::<f32>() {
                                     self.straight_pid_d = pid_d;
-                                    info!(
+                                    trace!(
                                         "CONFIG: straight PID controller parameter P = {}",
                                         pid_d
                                     );
@@ -130,7 +137,7 @@ impl Config {
                                     if self.turn_left_left_power > 100 {
                                         self.turn_left_left_power = 100;
                                     }
-                                    info!("CONFIG: left motor power for left turn = {}", power);
+                                    trace!("CONFIG: left motor power for left turn = {}", power);
                                 }
                             }
                         }
@@ -141,7 +148,7 @@ impl Config {
                                     if self.turn_left_right_power > 100 {
                                         self.turn_left_right_power = 100;
                                     }
-                                    info!("CONFIG: right motor power for left turn = {}", power);
+                                    trace!("CONFIG: right motor power for left turn = {}", power);
                                 }
                             }
                         }
@@ -152,7 +159,7 @@ impl Config {
                                     if self.turn_right_left_power > 100 {
                                         self.turn_right_left_power = 100;
                                     }
-                                    info!("CONFIG: left motor power for right turn = {}", power);
+                                    trace!("CONFIG: left motor power for right turn = {}", power);
                                 }
                             }
                         }
@@ -163,7 +170,7 @@ impl Config {
                                     if self.turn_right_right_power > 100 {
                                         self.turn_right_right_power = 100;
                                     }
-                                    info!("CONFIG: right motor power for right turn = {}", power);
+                                    trace!("CONFIG: right motor power for right turn = {}", power);
                                 }
                             }
                         }
@@ -179,7 +186,7 @@ impl Config {
                             if value.is_some() {
                                 if let Ok(delta) = value.unwrap().trim().parse::<i32>() {
                                     self.turn_right_stop_angle_delta = delta;
-                                    info!("CONFIG: stop angle delta for right turn = {}", delta);
+                                    trace!("CONFIG: stop angle delta for right turn = {}", delta);
                                 }
                             }
                         }
@@ -187,14 +194,38 @@ impl Config {
                             if value.is_some() {
                                 if let Ok(ticks_per_mm) = value.unwrap().trim().parse::<f32>() {
                                     self.wheel_ticks_per_mm = ticks_per_mm;
-                                    info!("CONFIG: wheel ticks per mm = {}", ticks_per_mm);
+                                    trace!("CONFIG: wheel ticks per mm = {}", ticks_per_mm);
                                 }
                             }
                         }
                         "idle_message" => {
                             if value.is_some() {
                                 self.idle_message = value.unwrap().trim().to_string();
-                                info!("CONFIG: idle message = {}", self.idle_message.as_str());
+                                trace!("CONFIG: idle message = {}", self.idle_message.as_str());
+                            }
+                        }
+                        "gyro_offset_x" => {
+                            if value.is_some() {
+                                if let Ok(offset) = value.unwrap().trim().parse::<i16>() {
+                                    self.gyro_offset_x = offset;
+                                    trace!("CONFIG: gyro offset x = {}", offset);
+                                }
+                            }
+                        }
+                        "gyro_offset_y" => {
+                            if value.is_some() {
+                                if let Ok(offset) = value.unwrap().trim().parse::<i16>() {
+                                    self.gyro_offset_y = offset;
+                                    trace!("CONFIG: gyro offset y = {}", offset);
+                                }
+                            }
+                        }
+                        "gyro_offset_z" => {
+                            if value.is_some() {
+                                if let Ok(offset) = value.unwrap().trim().parse::<i16>() {
+                                    self.gyro_offset_z = offset;
+                                    trace!("CONFIG: gyro offset z = {}", offset);
+                                }
                             }
                         }
                         _ => {
@@ -212,8 +243,8 @@ impl defmt::Format for Config {
     fn format(&self, f: defmt::Formatter<'_>) {
         defmt::write!(
             f,
-            "Config {{\n  straight_left_power = {},\n  straight_right_power = {},\n  straight_pid_p = {},\n  straight_pid_i = {},\n  straight_pid_d = {},\n  turn_left_left_power = {},\n  turn_left_right_power = {},\n  turn_right_left_power = {},\n  turn_right_right_power = {},\n  turn_left_stop_angle_delta = {},\n  turn_right_stop_angle_delta = {},\n  wheel_ticks_per_mm = {},\n  idle_message = {}\n}}",
-            self.straight_left_power, self.straight_right_power, self.straight_pid_p, self.straight_pid_i, self.straight_pid_d, self.turn_left_left_power, self.turn_left_right_power, self.turn_right_left_power, self.turn_right_right_power, self.turn_left_stop_angle_delta, self.turn_right_stop_angle_delta, self.wheel_ticks_per_mm, self.idle_message.as_str()
+            "Config {{\n  straight_left_power = {},\n  straight_right_power = {},\n  straight_pid_p = {},\n  straight_pid_i = {},\n  straight_pid_d = {},\n  turn_left_left_power = {},\n  turn_left_right_power = {},\n  turn_right_left_power = {},\n  turn_right_right_power = {},\n  turn_left_stop_angle_delta = {},\n  turn_right_stop_angle_delta = {},\n  wheel_ticks_per_mm = {},\n  idle_message = {}\n  gyro_offset_x = {}\n  gyro_offset_y = {}\n  gyro_offset_z = {}\n}}",
+            self.straight_left_power, self.straight_right_power, self.straight_pid_p, self.straight_pid_i, self.straight_pid_d, self.turn_left_left_power, self.turn_left_right_power, self.turn_right_left_power, self.turn_right_right_power, self.turn_left_stop_angle_delta, self.turn_right_stop_angle_delta, self.wheel_ticks_per_mm, self.idle_message.as_str(), self.gyro_offset_x, self.gyro_offset_y, self.gyro_offset_z
         );
     }
 }
@@ -222,8 +253,8 @@ impl core::fmt::Display for Config {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(
             f,
-            "Config {{\n  straight_left_power = {},\n  straight_right_power = {},\n  straight_pid_p = {},\n  straight_pid_i = {},\n  straight_pid_d = {},\n  turn_left_left_power = {},\n  turn_left_right_power = {},\n  turn_right_left_power = {},\n  turn_right_right_power = {},\n  turn_left_stop_angle_delta = {},\n  turn_right_stop_angle_delta = {},\n  wheel_ticks_per_mm = {},\n  idle_message = {}\n}}",
-            self.straight_left_power, self.straight_right_power, self.straight_pid_p, self.straight_pid_i, self.straight_pid_d, self.turn_left_left_power, self.turn_left_right_power, self.turn_right_left_power, self.turn_right_right_power, self.turn_left_stop_angle_delta, self.turn_right_stop_angle_delta, self.wheel_ticks_per_mm, self.idle_message.as_str()
+            "Config {{\n  straight_left_power = {},\n  straight_right_power = {},\n  straight_pid_p = {},\n  straight_pid_i = {},\n  straight_pid_d = {},\n  turn_left_left_power = {},\n  turn_left_right_power = {},\n  turn_right_left_power = {},\n  turn_right_right_power = {},\n  turn_left_stop_angle_delta = {},\n  turn_right_stop_angle_delta = {},\n  wheel_ticks_per_mm = {},\n  idle_message = {}\n  gyro_offset_x = {}\n  gyro_offset_y = {}\n  gyro_offset_z = {}\n}}",
+            self.straight_left_power, self.straight_right_power, self.straight_pid_p, self.straight_pid_i, self.straight_pid_d, self.turn_left_left_power, self.turn_left_right_power, self.turn_right_left_power, self.turn_right_right_power, self.turn_left_stop_angle_delta, self.turn_right_stop_angle_delta, self.wheel_ticks_per_mm, self.idle_message.as_str(), self.gyro_offset_x, self.gyro_offset_y, self.gyro_offset_z
         )
     }
 }

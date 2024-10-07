@@ -57,7 +57,10 @@ where
             }
         };
         // then close the file
-        self.volume_manager.borrow_mut().close_file(file).unwrap();
+        if let Err(e) = self.volume_manager.borrow_mut().close_file(file) {
+            error!("Error closing file '{}': {:?}", self.filename.as_str(), e);
+            return Err(e);
+        }
         Ok(())
     }
 
