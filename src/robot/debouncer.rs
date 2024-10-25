@@ -5,14 +5,14 @@ use embedded_hal::digital::InputPin;
 /// A debounced button. The button is considered pressed when the pin is equal to the level indicated by `ACTIVE`.
 /// `ACTIVE` being true indicates the button is active HIGH, and false indicates active LOW. A debounce
 /// period of `DEBOUNCE` milliseconds is used to prevent bouncing.
-pub struct DebouncedButton<PIN: InputPin, const ACTIVE: bool, const DEBOUNCE: u32> {
+pub struct DebouncedButton<PIN: InputPin, const ACTIVE: bool, const DEBOUNCE: u64> {
     pin: PIN,
     state: bool,
     press_consumed: bool,
-    last_change: u32,
+    last_change: u64,
 }
 
-impl<PIN: InputPin, const ACTIVE: bool, const DEBOUNCE: u32>
+impl<PIN: InputPin, const ACTIVE: bool, const DEBOUNCE: u64>
     DebouncedButton<PIN, ACTIVE, DEBOUNCE>
 {
     /// Create a new debounced button.

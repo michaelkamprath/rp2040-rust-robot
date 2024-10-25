@@ -1,6 +1,6 @@
 #[derive(Copy, Clone, Default)]
 pub struct StraightTelemetryRow {
-    time: u32,
+    time: u64,
     left_wheel_ticks: u32,
     right_wheel_ticks: u32,
     left_motor_power: u8,
@@ -25,7 +25,7 @@ impl StraightTelemetryRow {
     }
 
     pub fn new(
-        time: u32,
+        time: u64,
         left_wheel_ticks: u32,
         right_wheel_ticks: u32,
         left_motor_power: u8,

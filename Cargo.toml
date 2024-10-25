@@ -26,7 +26,7 @@ mpu6050 = { git = "https://github.com/michaelkamprath/mpu6050.git", branch = "em
     "defmt",
 ] }
 embedded-alloc = "0.6"
-i2c-character-display = { version = "0.1", features = ["defmt"] }
+i2c-character-display = { version = "0.2", features = ["defmt"] }
 ini_core = "0.2"
 
 # We're using a Pico by default on this template

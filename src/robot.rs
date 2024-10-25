@@ -62,7 +62,7 @@ const LEFT_ARROW_STRING: &str = "\x7F";
 const RIGHT_ARROW_STRING: &str = "\x7E";
 const DEGREES_STRING: &str = "\x03";
 
-const DISPLAY_RESET_DELAY_MS: u32 = 5000;
+const DISPLAY_RESET_DELAY_MS: u64 = 5000;
 
 const CONFIG_DIRECTORY: &str = "config";
 const CONFIG_FILE: &str = "config.ini";
@@ -86,8 +86,8 @@ static RIGHT_WHEEL_COUNTER: Mutex<Cell<u32>> = Mutex::new(Cell::new(0));
 // Constants for the robot
 //
 
-const BUTTON_DEBOUNCE_TIME_MS: u32 = 10;
-const CONTROLLER_SAMPLE_PERIOD_MS: u32 = 25;
+const BUTTON_DEBOUNCE_TIME_MS: u64 = 10;
+const CONTROLLER_SAMPLE_PERIOD_MS: u64 = 25;
 
 pub struct Robot<
     'a,
@@ -113,7 +113,7 @@ pub struct Robot<
         HeadingCalculator<embedded_hal_bus::i2c::CriticalSectionDevice<'a, TWI>>,
     lcd: AdafruitLCDBackpack<CriticalSectionDevice<'a, TWI>, Timer>,
     pub sd_card: FileStorage<SPI_DEV, DELAY>,
-    reset_display_start_millis: u32,
+    reset_display_start_millis: u64,
     log_index: u32,
     pub logger: Logger<SPI_DEV, DELAY, 128>,
     idle_message_line2: Option<String>,
@@ -313,6 +313,7 @@ where
         if self.reset_display_start_millis != 0
             && millis() - self.reset_display_start_millis > DISPLAY_RESET_DELAY_MS
         {
+            self.heading_calculator.update();
             debug!("Resetting LCD to idle message");
             let idle_message = self.config.idle_message.clone();
             if let Err(error) =
@@ -437,7 +438,7 @@ where
         .ok();
 
         let mut traveled_ticks: u32 = 0;
-        let mut last_update_millis = 0;
+        let mut last_update_millis: u64 = 0;
         let mut left_wheel_ticks = 0;
         let mut right_wheel_ticks = 0;
 
@@ -614,6 +615,7 @@ where
             error!("Error writing to LCD: {}", error.to_string().as_str());
         }
         self.heading_calculator.reset();
+        self.handle_loop();
         let mut current_angle = self.heading_calculator.heading();
         let mut last_adjust_angle = current_angle;
 

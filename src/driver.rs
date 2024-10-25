@@ -19,7 +19,7 @@ use micromath::F32Ext;
 
 const PATHS_DIR: &str = "paths";
 const PATH_EXTENTION: &str = "PTH";
-const SELECT_PATH_TIMEOUT_MS: u32 = 3500;
+const SELECT_PATH_TIMEOUT_MS: u64 = 3500;
 
 pub struct Driver<
     'a,
@@ -75,7 +75,7 @@ impl<
     pub fn delay(&mut self, ms: u32) {
         // we are going to call the loop handler in the delay function every ms until the delay is complete
         let start_millis = millis();
-        while millis() - start_millis < ms {
+        while millis() - start_millis < ms as u64 {
             self.robot.handle_loop();
             self.delay.delay_us(500);
         }

@@ -218,25 +218,22 @@ where
 {
     fn drop(&mut self) {
         info!("FileStorage dropped");
-        match &mut self.volume_mgr {
-            Some(volume_mgr) => {
-                if let Err(e) = volume_mgr
-                    .as_ref()
-                    .borrow_mut()
-                    .close_dir(self.root_dir.unwrap())
-                {
-                    error!("Error closing root dir: {:?}", e);
-                    return;
-                }
-                if let Err(e) = volume_mgr
-                    .as_ref()
-                    .borrow_mut()
-                    .close_volume(self.volume.unwrap())
-                {
-                    error!("Error closing volume: {:?}", e);
-                }
+        if let Some(volume_mgr) = &mut self.volume_mgr {
+            if let Err(e) = volume_mgr
+                .as_ref()
+                .borrow_mut()
+                .close_dir(self.root_dir.unwrap())
+            {
+                error!("Error closing root dir: {:?}", e);
+                return;
             }
-            None => {}
+            if let Err(e) = volume_mgr
+                .as_ref()
+                .borrow_mut()
+                .close_volume(self.volume.unwrap())
+            {
+                error!("Error closing volume: {:?}", e);
+            }
         }
     }
 }

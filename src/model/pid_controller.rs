@@ -10,7 +10,7 @@ pub struct PIDController {
     pub setpoint: f32,
     pub integral: f32,
     pub last_error: f32,
-    pub last_time: u32,
+    pub last_time: u64,
     pub max_control_signal: f32,
 }
 
@@ -46,7 +46,7 @@ impl PIDController {
     }
 
     /// Update the controller with a new measurement and the time of the measurement.
-    pub fn update(&mut self, measurement: f32, measurement_time: u32) -> f32 {
+    pub fn update(&mut self, measurement: f32, measurement_time: u64) -> f32 {
         if self.last_time > measurement_time {
             error!(
                 "Time went backwards! {} -> {}",
@@ -72,7 +72,7 @@ impl PIDController {
     }
 
     /// Reset the controller to its initial state.
-    pub fn reset(&mut self, start_time: u32) {
+    pub fn reset(&mut self, start_time: u64) {
         self.integral = 0.0;
         self.last_error = 0.0;
         self.last_time = start_time;

@@ -1,6 +1,6 @@
 #![allow(non_camel_case_types)]
 
-use crate::system::millis::millis;
+use crate::system::millis::millis_tenths;
 
 use defmt::{error, info};
 use embedded_hal::{delay::DelayNs, i2c::I2c};
@@ -13,13 +13,13 @@ use mpu6050::Mpu6050;
 //      [-2241,-2240] --> [-1,15]	    [1803,1804] --> [-10,6]	    [1573,1574] --> [16371,16394]	[98,99] --> [-2,1]	    [44,45] --> [0,5]	    [19,20] --> [0,4]
 //      [-2239,-2238] --> [-3,16]	    [1804,1804] --> [0,5]	    [1575,1576] --> [16378,16395]	[98,99] --> [-1,2]	    [43,44] --> [-2,1]	    [19,20] --> [-1,2]
 
-const HEADING_UPDATE_INTERVAL_MS: u32 = 1;
+const HEADING_UPDATE_INTERVAL_MS_TENTHS: u64 = 2;
 
 pub struct HeadingCalculator<TWI> {
     heading: f32,
     gyro: Mpu6050<TWI>,
     last_update_rate: f32,
-    last_update_millis: u32,
+    last_update_millis_tenths: u64,
     inited: bool,
 }
 
@@ -66,7 +66,7 @@ where
             heading: 0.0,
             gyro,
             last_update_rate: 0.0,
-            last_update_millis: millis(),
+            last_update_millis_tenths: millis_tenths(),
             inited,
         }
     }
@@ -106,21 +106,21 @@ where
     pub fn reset(&mut self) {
         self.heading = 0.0;
         self.last_update_rate = 0.0;
-        self.last_update_millis = millis();
+        self.last_update_millis_tenths = millis_tenths();
     }
 
     pub fn update(&mut self) -> f32 {
         if !self.is_inited() {
             return 0.0;
         }
-        let now = millis();
-        let delta_time = now - self.last_update_millis;
-        if delta_time >= HEADING_UPDATE_INTERVAL_MS {
+        let now = millis_tenths();
+        let delta_time = now - self.last_update_millis_tenths;
+        if delta_time >= HEADING_UPDATE_INTERVAL_MS_TENTHS {
             match self.gyro.get_gyro_deg() {
                 Ok(gyro) => {
-                    self.last_update_millis = now;
+                    self.last_update_millis_tenths = now;
                     // the heding is about the sensor's Z-axis
-                    let delta_degs = gyro.z * (delta_time as f32 / 1000.0);
+                    let delta_degs = gyro.z * (delta_time as f32 / 10000.0);
                     self.heading += delta_degs;
                     self.last_update_rate = gyro.z;
 
