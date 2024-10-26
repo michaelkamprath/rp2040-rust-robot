@@ -487,7 +487,7 @@ where
                 last_update_millis = millis();
 
                 let heading = self.heading_calculator.heading();
-                let control_signal = controller.update(heading, last_update_millis);
+                let control_signal = controller.update(heading as f32, last_update_millis);
 
                 let mut cs_indicator: &str = direction_arrow;
                 // positive control signal means turn left, a negative control signal means turn right
@@ -616,7 +616,7 @@ where
         }
         self.heading_calculator.reset();
         self.handle_loop();
-        let mut current_angle = self.heading_calculator.heading();
+        let mut current_angle = self.heading_calculator.heading() as f32;
         let mut last_adjust_angle = current_angle;
 
         // start the motors per right hand rule (postive angle = left turn, negative angle = right turn)
@@ -642,7 +642,7 @@ where
         };
 
         while current_angle.abs() < (turn_degrees.abs() + stop_angle_delta) as f32 {
-            current_angle = self.heading_calculator.heading();
+            current_angle = self.heading_calculator.heading() as f32;
             if (current_angle - last_adjust_angle).abs() > 10.0 {
                 last_adjust_angle = current_angle;
                 if let Err(error) = core::write!(
@@ -662,7 +662,7 @@ where
         self.motors.brake();
         self.delay.delay_ms(100);
         self.motors.stop();
-        current_angle = self.heading_calculator.heading();
+        current_angle = self.heading_calculator.heading() as f32;
         if let Err(error) = core::write!(
             self.clear_lcd().set_lcd_cursor(0, 0),
             "{} {} / {}\x03",

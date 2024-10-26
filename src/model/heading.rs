@@ -16,9 +16,9 @@ use mpu6050::Mpu6050;
 const HEADING_UPDATE_INTERVAL_MS_TENTHS: u64 = 2;
 
 pub struct HeadingCalculator<TWI> {
-    heading: f32,
+    heading: f64,
     gyro: Mpu6050<TWI>,
-    last_update_rate: f32,
+    last_update_rate: f64,
     last_update_millis_tenths: u64,
     inited: bool,
 }
@@ -109,7 +109,7 @@ where
         self.last_update_millis_tenths = millis_tenths();
     }
 
-    pub fn update(&mut self) -> f32 {
+    pub fn update(&mut self) -> f64 {
         if !self.is_inited() {
             return 0.0;
         }
@@ -120,9 +120,11 @@ where
                 Ok(gyro) => {
                     self.last_update_millis_tenths = now;
                     // the heding is about the sensor's Z-axis
-                    let delta_degs = gyro.z * (delta_time as f32 / 10000.0);
+                    let delta_degs = (self.last_update_rate + gyro.z as f64)
+                        * (delta_time as f64 / 10000.0)
+                        / 2.0;
                     self.heading += delta_degs;
-                    self.last_update_rate = gyro.z;
+                    self.last_update_rate = gyro.z as f64;
 
                     if self.heading > 180.0 {
                         self.heading -= 360.0;
@@ -139,7 +141,7 @@ where
         self.heading
     }
 
-    pub fn heading(&mut self) -> f32 {
+    pub fn heading(&mut self) -> f64 {
         self.update()
     }
 }

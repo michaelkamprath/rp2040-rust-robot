@@ -5,7 +5,7 @@ pub struct StraightTelemetryRow {
     right_wheel_ticks: u32,
     left_motor_power: u8,
     right_motor_power: u8,
-    heading: f32,
+    heading: f64,
     control_signal: f32,
 }
 
@@ -30,7 +30,7 @@ impl StraightTelemetryRow {
         right_wheel_ticks: u32,
         left_motor_power: u8,
         right_motor_power: u8,
-        heading: f32,
+        heading: f64,
         control_signal: f32,
     ) -> Self {
         Self {
