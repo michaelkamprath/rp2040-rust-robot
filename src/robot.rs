@@ -99,19 +99,21 @@ pub struct Robot<
     ENB: SetDutyCycle,
     BUTT1: InputPin,
     BUTT2: InputPin,
-    TWI,
+    TWI0,
+    TWI1,
     SPI_DEV: embedded_hal::spi::SpiDevice<u8>,
     DELAY,
 > where
-    TWI: embedded_hal::i2c::I2c,
+    TWI0: embedded_hal::i2c::I2c,
+    TWI1: embedded_hal::i2c::I2c,
     DELAY: DelayNs,
 {
     motors: MotorController<INA1, INA2, INB1, INB2, ENA, ENB>,
     button1: DebouncedButton<BUTT1, false, BUTTON_DEBOUNCE_TIME_MS>,
     button2: DebouncedButton<BUTT2, false, BUTTON_DEBOUNCE_TIME_MS>,
     pub heading_calculator:
-        HeadingCalculator<embedded_hal_bus::i2c::CriticalSectionDevice<'a, TWI>>,
-    lcd: AdafruitLCDBackpack<CriticalSectionDevice<'a, TWI>, Timer>,
+        HeadingCalculator<embedded_hal_bus::i2c::CriticalSectionDevice<'a, TWI0>>,
+    lcd: AdafruitLCDBackpack<CriticalSectionDevice<'a, TWI1>, Timer>,
     pub sd_card: FileStorage<SPI_DEV, DELAY>,
     reset_display_start_millis: u64,
     log_index: u32,
@@ -132,12 +134,14 @@ impl<
         ENB: SetDutyCycle,
         BUTT1: InputPin,
         BUTT2: InputPin,
-        TWI,
+        TWI0,
+        TWI1,
         SPI_DEV: embedded_hal::spi::SpiDevice<u8>,
         DELAY,
-    > Robot<'a, INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI, SPI_DEV, DELAY>
+    > Robot<'a, INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI0, TWI1, SPI_DEV, DELAY>
 where
-    TWI: embedded_hal::i2c::I2c,
+    TWI0: embedded_hal::i2c::I2c,
+    TWI1: embedded_hal::i2c::I2c,
     DELAY: DelayNs + Clone,
 {
     #[allow(clippy::too_many_arguments)]
@@ -150,7 +154,8 @@ where
         duty_b: ENB,
         button1_pin: BUTT1,
         button2_pin: BUTT2,
-        i2c_refcell: &'a critical_section::Mutex<RefCell<TWI>>,
+        i2c0_refcell: &'a critical_section::Mutex<RefCell<TWI0>>,
+        i2c1_refcell: &'a critical_section::Mutex<RefCell<TWI1>>,
         left_counter_pin: LeftWheelCounterPin,
         right_counter_pin: RightWheelCounterPin,
         mut sd_card: FileStorage<SPI_DEV, DELAY>,
@@ -174,9 +179,8 @@ where
             pac::NVIC::unmask(pac::Interrupt::IO_IRQ_BANK0);
         }
 
-        // let i2c_device = embedded_hal_bus::i2c::RefCellDevice::new(i2c_refcell);
-        let i2c_device = embedded_hal_bus::i2c::CriticalSectionDevice::new(i2c_refcell);
-        let mut lcd = AdafruitLCDBackpack::new(i2c_device, LcdDisplayType::Lcd16x2, *timer);
+        let i2c1_device = embedded_hal_bus::i2c::CriticalSectionDevice::new(i2c1_refcell);
+        let mut lcd = AdafruitLCDBackpack::new(i2c1_device, LcdDisplayType::Lcd16x2, *timer);
         match lcd.init() {
             Ok(_) => {
                 info!("LCD initialized");
@@ -214,7 +218,7 @@ where
         debug!("LCD characters created");
 
         let mut heading_calculator = HeadingCalculator::new(
-            embedded_hal_bus::i2c::CriticalSectionDevice::new(i2c_refcell),
+            embedded_hal_bus::i2c::CriticalSectionDevice::new(i2c0_refcell),
             timer,
         );
         heading_calculator.reset();
@@ -229,7 +233,7 @@ where
                     "SD: {} GB",
                     sd_card.volume_size().unwrap_or(0) / 1_073_741_824
                 )
-                .map_err(i2c_character_display::Error::FormattingError)
+                .map_err(i2c_character_display::CharacterDisplayError::FormattingError)
             })
         {
             error!("Error writing to LCD");
@@ -693,7 +697,8 @@ where
     //--------------------------------------------------------------------------
     pub fn display_heading(
         &mut self,
-    ) -> Result<(), i2c_character_display::Error<CriticalSectionDevice<'a, TWI>>> {
+    ) -> Result<(), i2c_character_display::CharacterDisplayError<CriticalSectionDevice<'a, TWI1>>>
+    {
         write!(self.lcd.clear()?.set_cursor(0, 0)?, "Heading:").ok();
         self.heading_calculator.reset();
         let mut continue_loop = true;
@@ -748,12 +753,15 @@ impl<
         ENB: SetDutyCycle,
         BUTT1: InputPin,
         BUTT2: InputPin,
-        TWI,
+        TWI0,
+        TWI1,
         SPI_DEV: SpiDevice<u8>,
         DELAY,
-    > Format for Robot<'a, INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI, SPI_DEV, DELAY>
+    > Format
+    for Robot<'a, INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI0, TWI1, SPI_DEV, DELAY>
 where
-    TWI: I2c,
+    TWI0: I2c,
+    TWI1: I2c,
     DELAY: DelayNs + Clone,
 {
     fn format(&self, f: defmt::Formatter) {
@@ -777,13 +785,15 @@ impl<
         ENB: SetDutyCycle,
         BUTT1: InputPin,
         BUTT2: InputPin,
-        TWI,
+        TWI0,
+        TWI1,
         SPI_DEV: SpiDevice<u8>,
         DELAY,
     > core::fmt::Write
-    for Robot<'a, INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI, SPI_DEV, DELAY>
+    for Robot<'a, INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI0, TWI1, SPI_DEV, DELAY>
 where
-    TWI: I2c,
+    TWI0: I2c,
+    TWI1: I2c,
     DELAY: DelayNs + Clone,
 {
     fn write_str(&mut self, s: &str) -> core::fmt::Result {

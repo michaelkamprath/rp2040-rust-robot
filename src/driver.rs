@@ -31,12 +31,13 @@ pub struct Driver<
     ENB: SetDutyCycle,
     BUTT1: InputPin,
     BUTT2: InputPin,
-    TWI: I2c,
+    TWI0: I2c,
+    TWI1: I2c,
     SPI_DEV: SpiDevice<u8>,
     DELAY: DelayNs + Clone,
     LED1: OutputPin,
 > {
-    robot: Robot<'a, INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI, SPI_DEV, DELAY>,
+    robot: Robot<'a, INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI0, TWI1, SPI_DEV, DELAY>,
     delay: DELAY,
     led1: LED1,
     selected_path: Option<String>,
@@ -52,14 +53,29 @@ impl<
         ENB: SetDutyCycle,
         BUTT1: InputPin,
         BUTT2: InputPin,
-        TWI: I2c,
+        TWI0: I2c,
+        TWI1: I2c,
         SPI_DEV: SpiDevice<u8>,
         DELAY: DelayNs + Clone,
         LED1: OutputPin,
-    > Driver<'a, INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI, SPI_DEV, DELAY, LED1>
+    > Driver<'a, INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI0, TWI1, SPI_DEV, DELAY, LED1>
 {
     pub fn new(
-        robot: Robot<'a, INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI, SPI_DEV, DELAY>,
+        robot: Robot<
+            'a,
+            INA1,
+            INA2,
+            INB1,
+            INB2,
+            ENA,
+            ENB,
+            BUTT1,
+            BUTT2,
+            TWI0,
+            TWI1,
+            SPI_DEV,
+            DELAY,
+        >,
         delay: DELAY,
         led1_pin: LED1,
     ) -> Self {

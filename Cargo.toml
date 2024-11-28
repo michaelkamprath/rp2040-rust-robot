@@ -8,6 +8,7 @@ license = "MIT OR Apache-2.0"
 name = "rp2040-rust-robot"
 test = false
 bench = false
+doctest = false
 
 [dependencies]
 cortex-m = "0.7"
@@ -26,7 +27,7 @@ mpu6050 = { git = "https://github.com/michaelkamprath/mpu6050.git", branch = "em
     "defmt",
 ] }
 embedded-alloc = "0.6"
-i2c-character-display = { version = "0.2", features = ["defmt"] }
+i2c-character-display = { version = "0.4", features = ["defmt"] }
 ini_core = "0.2"
 
 # We're using a Pico by default on this template

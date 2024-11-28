@@ -89,20 +89,32 @@ fn main() -> ! {
     channel_b.output_to(pins.gpio9);
 
     // Configure two pins as being I²C, not GPIO
-    let sda_pin: Pin<_, FunctionI2C, PullUp> = pins.gpio4.reconfigure();
-    let scl_pin: Pin<_, FunctionI2C, PullUp> = pins.gpio5.reconfigure();
-
+    let sda0_pin: Pin<_, FunctionI2C, PullUp> = pins.gpio4.reconfigure();
+    let scl0_pin: Pin<_, FunctionI2C, PullUp> = pins.gpio5.reconfigure();
+    let sda1_pin: Pin<_, FunctionI2C, PullUp> = pins.gpio6.reconfigure();
+    let scl1_pin: Pin<_, FunctionI2C, PullUp> = pins.gpio7.reconfigure();
     // set up I2C
-    let i2c = bsp::hal::I2C::new_controller(
+    let i2c0 = bsp::hal::I2C::new_controller(
         pac.I2C0,
-        sda_pin,
-        scl_pin,
+        sda0_pin,
+        scl0_pin,
         HertzU32::from_raw(400_000),
         &mut pac.RESETS,
         clocks.system_clock.freq(),
     );
-    let i2c_ref_cell = RefCell::new(i2c);
-    let i2c_mutex = critical_section::Mutex::new(i2c_ref_cell);
+    let i2c0_ref_cell = RefCell::new(i2c0);
+    let i2c0_mutex = critical_section::Mutex::new(i2c0_ref_cell);
+
+    let i2c1 = bsp::hal::I2C::new_controller(
+        pac.I2C1,
+        sda1_pin,
+        scl1_pin,
+        HertzU32::from_raw(400_000),
+        &mut pac.RESETS,
+        clocks.system_clock.freq(),
+    );
+    let i2c1_ref_cell = RefCell::new(i2c1);
+    let i2c1_mutex = critical_section::Mutex::new(i2c1_ref_cell);
 
     // set up SPI
     #[allow(clippy::type_complexity)]
@@ -152,7 +164,8 @@ fn main() -> ! {
         channel_b,
         pins.gpio14.into_pull_up_input(),
         pins.gpio15.into_pull_up_input(),
-        &i2c_mutex,
+        &i2c0_mutex,
+        &i2c1_mutex,
         pins.gpio21.into_pull_up_input(),
         pins.gpio20.into_pull_up_input(),
         sd,
