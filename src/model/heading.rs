@@ -6,6 +6,7 @@ use defmt::{error, info};
 use embedded_hal::{delay::DelayNs, i2c::I2c};
 use micromath::vector::Vector3d;
 use mpu6050::Mpu6050;
+use rp_pico::hal::multicore::Stack;
 
 // My MCU6050 calibration values
 // ..	XAccel			                YAccel				        ZAccel			                XGyro			        YGyro			        ZGyro
@@ -28,7 +29,11 @@ impl<TWI> HeadingCalculator<TWI>
 where
     TWI: I2c,
 {
-    pub fn new<DELAY>(i2c: TWI, timer: &mut DELAY) -> Self
+    pub fn new<DELAY>(
+        i2c: TWI,
+        timer: &mut DELAY,
+        core1: &mut rp_pico::hal::multicore::Core,
+    ) -> Self
     where
         DELAY: DelayNs,
     {

@@ -6,7 +6,10 @@ mod motor_controller;
 mod telemetry;
 
 use crate::{
-    model::{heading::HeadingCalculator, pid_controller::PIDController},
+    model::{
+        heading_core1::{self, HeadingManager},
+        pid_controller::PIDController,
+    },
     robot::{
         config::Config,
         debouncer::DebouncedButton,
@@ -37,8 +40,17 @@ use embedded_hal::{
 use embedded_hal_bus::i2c::CriticalSectionDevice;
 use i2c_character_display::{AdafruitLCDBackpack, LcdDisplayType};
 use micromath::F32Ext;
-use rp_pico::hal::{gpio, Timer};
 use rp_pico::hal::{
+    fugit::Rate,
+    gpio::{
+        self,
+        bank0::{Gpio4, Gpio5},
+        FunctionI2C, PinId, PullUp,
+    },
+    Timer, I2C,
+};
+use rp_pico::hal::{
+    gpio::Pin,
     gpio::{
         bank0::{Gpio20, Gpio21},
         FunctionSio, Interrupt, SioInput,
@@ -99,20 +111,16 @@ pub struct Robot<
     ENB: SetDutyCycle,
     BUTT1: InputPin,
     BUTT2: InputPin,
-    TWI0,
     TWI1,
     SPI_DEV: embedded_hal::spi::SpiDevice<u8>,
     DELAY,
 > where
-    TWI0: embedded_hal::i2c::I2c,
     TWI1: embedded_hal::i2c::I2c,
     DELAY: DelayNs,
 {
     motors: MotorController<INA1, INA2, INB1, INB2, ENA, ENB>,
     button1: DebouncedButton<BUTT1, false, BUTTON_DEBOUNCE_TIME_MS>,
     button2: DebouncedButton<BUTT2, false, BUTTON_DEBOUNCE_TIME_MS>,
-    pub heading_calculator:
-        HeadingCalculator<embedded_hal_bus::i2c::CriticalSectionDevice<'a, TWI0>>,
     lcd: AdafruitLCDBackpack<CriticalSectionDevice<'a, TWI1>, Timer>,
     pub sd_card: FileStorage<SPI_DEV, DELAY>,
     reset_display_start_millis: u64,
@@ -121,6 +129,7 @@ pub struct Robot<
     idle_message_line2: Option<String>,
     config: Config,
     delay: Timer,
+    heading_core1: HeadingManager<'a>,
 }
 
 #[allow(dead_code, non_camel_case_types)]
@@ -134,13 +143,11 @@ impl<
         ENB: SetDutyCycle,
         BUTT1: InputPin,
         BUTT2: InputPin,
-        TWI0,
         TWI1,
         SPI_DEV: embedded_hal::spi::SpiDevice<u8>,
         DELAY,
-    > Robot<'a, INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI0, TWI1, SPI_DEV, DELAY>
+    > Robot<'a, INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI1, SPI_DEV, DELAY>
 where
-    TWI0: embedded_hal::i2c::I2c,
     TWI1: embedded_hal::i2c::I2c,
     DELAY: DelayNs + Clone,
 {
@@ -154,12 +161,15 @@ where
         duty_b: ENB,
         button1_pin: BUTT1,
         button2_pin: BUTT2,
-        i2c0_refcell: &'a critical_section::Mutex<RefCell<TWI0>>,
         i2c1_refcell: &'a critical_section::Mutex<RefCell<TWI1>>,
         left_counter_pin: LeftWheelCounterPin,
         right_counter_pin: RightWheelCounterPin,
         mut sd_card: FileStorage<SPI_DEV, DELAY>,
         timer: &mut Timer,
+        core1: &'a mut rp_pico::hal::multicore::Core<'a>,
+        sys_freq: Rate<u32, 1, 1>,
+        i2c0_sda_pin: Pin<Gpio4, FunctionI2C, PullUp>,
+        i2c0_scl_pin: Pin<Gpio5, FunctionI2C, PullUp>,
     ) -> Self {
         // create the motor controller
         let motors = MotorController::new(ina1_pin, ina2_pin, inb1_pin, inb2_pin, duty_a, duty_b);
@@ -217,11 +227,12 @@ where
         };
         debug!("LCD characters created");
 
-        let mut heading_calculator = HeadingCalculator::new(
-            embedded_hal_bus::i2c::CriticalSectionDevice::new(i2c0_refcell),
-            timer,
-        );
-        heading_calculator.reset();
+        // let mut heading_calculator = HeadingCalculator::new(
+        //     embedded_hal_bus::i2c::CriticalSectionDevice::new(i2c0_refcell),
+        //     timer,
+        //     core1,
+        // );
+        // heading_calculator.reset();
 
         if let Err(_e) = lcd
             .home()
@@ -240,11 +251,14 @@ where
         }
 
         let logger = Logger::new(Logger::<SPI_DEV, DELAY, 128>::init_log_file(&mut sd_card));
+
+        let mut heading_core1 = HeadingManager::new(core1, sys_freq);
+        heading_core1.start_heading_calculation(timer.clone(), i2c0_sda_pin, i2c0_scl_pin);
+
         Self {
             motors,
             button1: DebouncedButton::<BUTT1, false, BUTTON_DEBOUNCE_TIME_MS>::new(button1_pin),
             button2: DebouncedButton::<BUTT2, false, BUTTON_DEBOUNCE_TIME_MS>::new(button2_pin),
-            heading_calculator,
             lcd,
             sd_card,
             reset_display_start_millis: millis(), // start the display reset timer to clear the "started" message
@@ -253,6 +267,7 @@ where
             idle_message_line2: None,
             config: Config::new(),
             delay: *timer,
+            heading_core1,
         }
     }
 
@@ -262,10 +277,10 @@ where
         if self.sd_card.root_dir().is_some() {
             let root_dir = self.sd_card.root_dir().unwrap();
             let config_dir = match self.sd_card.open_directory(root_dir, CONFIG_DIRECTORY) {
-                Some(d) => d,
-                None => {
-                    error!("Error opening config directory");
-                    return Err(embedded_sdmmc::Error::NotFound);
+                Ok(d) => d,
+                Err(e) => {
+                    error!("Error opening config directory: {}", e);
+                    return Err(e);
                 }
             };
             if let Ok(mut config_file) = self.sd_card.open_file_in_dir(
@@ -285,13 +300,13 @@ where
                 self.config.set_config_values(config_str);
 
                 // set the gyro offsets from the config file
-                if self.heading_calculator.is_inited() {
-                    self.heading_calculator.set_gyro_offsets(
-                        self.config.gyro_offset_x,
-                        self.config.gyro_offset_y,
-                        self.config.gyro_offset_z,
-                    );
-                }
+                // if self.heading_calculator.is_inited() {
+                //     self.heading_calculator.set_gyro_offsets(
+                //         self.config.gyro_offset_x,
+                //         self.config.gyro_offset_y,
+                //         self.config.gyro_offset_z,
+                //     );
+                // }
             } else {
                 debug!("Config file not found, using defaults");
             }
@@ -305,11 +320,11 @@ where
     }
 
     pub fn calibrate_gyro(&mut self, delay: &mut DELAY) {
-        self.heading_calculator.calibrate(delay, |step| {
-            if let Ok(lcd) = self.lcd.set_cursor(0, 1) {
-                write!(lcd, "iteration: {}", step).ok();
-            }
-        });
+        // self.heading_calculator.calibrate(delay, |step| {
+        //     if let Ok(lcd) = self.lcd.set_cursor(0, 1) {
+        //         write!(lcd, "iteration: {}", step).ok();
+        //     }
+        // });
     }
 
     /// This function is called in the main loop to allow the robot to handle state updates
@@ -317,7 +332,7 @@ where
         if self.reset_display_start_millis != 0
             && millis() - self.reset_display_start_millis > DISPLAY_RESET_DELAY_MS
         {
-            self.heading_calculator.update();
+            // self.heading_calculator.update();
             debug!("Resetting LCD to idle message");
             let idle_message = self.config.idle_message.clone();
             if let Err(error) =
@@ -338,7 +353,7 @@ where
         self.button1.handle_loop();
         self.button2.handle_loop();
 
-        self.heading_calculator.update();
+        // self.heading_calculator.update();
     }
 
     pub fn set_idle_message_line2(&mut self, message: Option<String>) {
@@ -453,7 +468,7 @@ where
         );
         // we want to go straight, so the setpoint is 0
         controller.set_setpoint(0.);
-        self.heading_calculator.reset();
+        // self.heading_calculator.reset();
 
         self.motors.set_duty(
             self.config.straight_left_power,
@@ -469,7 +484,8 @@ where
                 0,
                 100,
                 100,
-                self.heading_calculator.heading(),
+                // self.heading_calculator.heading(),
+                180.0, // FIXME: remove this hardcoded value
                 0.,
             ),
         )
@@ -490,7 +506,8 @@ where
             if millis() - last_update_millis > CONTROLLER_SAMPLE_PERIOD_MS {
                 last_update_millis = millis();
 
-                let heading = self.heading_calculator.heading();
+                // let heading = self.heading_calculator.heading();
+                let heading = 0.0; // FIXME: remove this hardcoded value
                 let control_signal = controller.update(heading as f32, last_update_millis);
 
                 let mut cs_indicator: &str = direction_arrow;
@@ -523,7 +540,7 @@ where
                     ),
                 )
                 .ok();
-                self.heading_calculator.update();
+                // self.heading_calculator.update();
 
                 let wheel_ticks_per_mm = self.config.wheel_ticks_per_mm;
                 if let Err(error) = core::write!(
@@ -535,7 +552,7 @@ where
                 ) {
                     error!("Error writing to LCD: {}", error.to_string().as_str());
                 }
-                self.heading_calculator.update();
+                // self.heading_calculator.update();
                 if let Err(error) = core::write!(
                     self.set_lcd_cursor(0, 1),
                     "{} : cs={:.3}",
@@ -572,7 +589,8 @@ where
                 right_wheel_ticks,
                 0,
                 0,
-                self.heading_calculator.heading(),
+                // self.heading_calculator.heading(),
+                0.0, // FIXME: remove this hardcoded value
                 0.,
             ),
         )
@@ -618,9 +636,10 @@ where
         ) {
             error!("Error writing to LCD: {}", error.to_string().as_str());
         }
-        self.heading_calculator.reset();
+        // self.heading_calculator.reset();
         self.handle_loop();
-        let mut current_angle = self.heading_calculator.heading() as f32;
+        // let mut current_angle = self.heading_calculator.heading() as f32;
+        let mut current_angle = 0.0; // FIXME: remove this hardcoded value
         let mut last_adjust_angle = current_angle;
 
         // start the motors per right hand rule (postive angle = left turn, negative angle = right turn)
@@ -646,7 +665,8 @@ where
         };
 
         while current_angle.abs() < (turn_degrees.abs() + stop_angle_delta) as f32 {
-            current_angle = self.heading_calculator.heading() as f32;
+            // current_angle = self.heading_calculator.heading() as f32;
+            current_angle = 0.0; // FIXME: remove this hardcoded value
             if (current_angle - last_adjust_angle).abs() > 10.0 {
                 last_adjust_angle = current_angle;
                 if let Err(error) = core::write!(
@@ -662,11 +682,13 @@ where
 
             self.handle_loop();
         }
-        let motors_off_heading = self.heading_calculator.heading();
+        // let motors_off_heading = self.heading_calculator.heading();
+        let motors_off_heading = 0.0; // FIXME: remove this hardcoded value
         self.motors.brake();
         self.delay.delay_ms(100);
         self.motors.stop();
-        current_angle = self.heading_calculator.heading() as f32;
+        // current_angle = self.heading_calculator.heading() as f32;
+        current_angle = 0.0; // FIXME: remove this hardcoded value
         if let Err(error) = core::write!(
             self.clear_lcd().set_lcd_cursor(0, 0),
             "{} {} / {}\x03",
@@ -700,7 +722,7 @@ where
     ) -> Result<(), i2c_character_display::CharacterDisplayError<CriticalSectionDevice<'a, TWI1>>>
     {
         write!(self.lcd.clear()?.set_cursor(0, 0)?, "Heading:").ok();
-        self.heading_calculator.reset();
+        // self.heading_calculator.reset();
         let mut continue_loop = true;
 
         let mut last_update_millis = 0;
@@ -709,15 +731,24 @@ where
             if self.button1_pressed() || self.button2_pressed() {
                 continue_loop = false;
             }
-            if millis() - last_update_millis > 500 {
-                let heading = self.heading_calculator.heading();
-                if let Err(error) = core::write!(
+            if millis() - last_update_millis > 200 {
+                // let heading = self.heading_calculator.heading();
+                // if let Err(error) = core::write!(
+                //     self.lcd.set_cursor(0, 1)?,
+                //     "{:.2}{: <16}",
+                //     heading,
+                //     DEGREES_STRING
+                // ) {
+                //     error!("Error writing to LCD: {}", error.to_string().as_str());
+                // }
+                let heading = self.heading_core1.get_heading();
+                if let Err(e) = core::write!(
                     self.lcd.set_cursor(0, 1)?,
                     "{:.2}{: <16}",
                     heading,
                     DEGREES_STRING
                 ) {
-                    error!("Error writing to LCD: {}", error.to_string().as_str());
+                    error!("Error writing to LCD: {}", e.to_string().as_str());
                 }
                 last_update_millis = millis();
             }
@@ -753,14 +784,11 @@ impl<
         ENB: SetDutyCycle,
         BUTT1: InputPin,
         BUTT2: InputPin,
-        TWI0,
         TWI1,
         SPI_DEV: SpiDevice<u8>,
         DELAY,
-    > Format
-    for Robot<'a, INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI0, TWI1, SPI_DEV, DELAY>
+    > Format for Robot<'a, INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI1, SPI_DEV, DELAY>
 where
-    TWI0: I2c,
     TWI1: I2c,
     DELAY: DelayNs + Clone,
 {
@@ -785,14 +813,12 @@ impl<
         ENB: SetDutyCycle,
         BUTT1: InputPin,
         BUTT2: InputPin,
-        TWI0,
         TWI1,
         SPI_DEV: SpiDevice<u8>,
         DELAY,
     > core::fmt::Write
-    for Robot<'a, INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI0, TWI1, SPI_DEV, DELAY>
+    for Robot<'a, INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI1, SPI_DEV, DELAY>
 where
-    TWI0: I2c,
     TWI1: I2c,
     DELAY: DelayNs + Clone,
 {

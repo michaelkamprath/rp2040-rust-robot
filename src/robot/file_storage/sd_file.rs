@@ -38,11 +38,13 @@ where
 
     pub fn init(&mut self) -> Result<(), embedded_sdmmc::Error<SdCardError>> {
         // first open the file per the passed mode
-        let file = match self.volume_manager.borrow_mut().open_file_in_dir(
-            self.directory,
-            self.filename.as_str(),
-            self.mode,
-        ) {
+        let file = match critical_section::with(|_| {
+            self.volume_manager.borrow_mut().open_file_in_dir(
+                self.directory,
+                self.filename.as_str(),
+                self.mode,
+            )
+        }) {
             Ok(f) => {
                 debug!(
                     "Opened file '{}' with mode {}",
@@ -57,7 +59,9 @@ where
             }
         };
         // then close the file
-        if let Err(e) = self.volume_manager.borrow_mut().close_file(file) {
+        if let Err(e) =
+            critical_section::with(|_| self.volume_manager.borrow_mut().close_file(file))
+        {
             error!("Error closing file '{}': {:?}", self.filename.as_str(), e);
             return Err(e);
         }
