@@ -1,6 +1,5 @@
 #![allow(clippy::type_complexity)]
 pub mod logger;
-pub mod sd_card_spi_device;
 pub mod sd_file;
 
 use alloc::{rc::Rc, string::ToString, vec::Vec};

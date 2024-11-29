@@ -27,4 +27,4 @@ rustflags = [
 target = "thumbv6m-none-eabi"
 
 [env]
-DEFMT_LOG = "embedded_sdmmc=debug,debug"
+DEFMT_LOG = "embedded_sdmmc=info,debug"

@@ -6,10 +6,7 @@ mod motor_controller;
 mod telemetry;
 
 use crate::{
-    model::{
-        heading_core1::{self, HeadingManager},
-        pid_controller::PIDController,
-    },
+    model::{heading_core1::HeadingManager, pid_controller::PIDController},
     robot::{
         config::Config,
         debouncer::DebouncedButton,
@@ -39,15 +36,15 @@ use embedded_hal::{
 };
 use embedded_hal_bus::i2c::CriticalSectionDevice;
 use i2c_character_display::{AdafruitLCDBackpack, LcdDisplayType};
-use micromath::F32Ext;
+use micromath::{vector::Vector3d, F32Ext};
 use rp_pico::hal::{
     fugit::Rate,
     gpio::{
         self,
         bank0::{Gpio4, Gpio5},
-        FunctionI2C, PinId, PullUp,
+        FunctionI2C, PullUp,
     },
-    Timer, I2C,
+    Timer,
 };
 use rp_pico::hal::{
     gpio::Pin,
@@ -168,8 +165,6 @@ where
         timer: &mut Timer,
         core1: &'a mut rp_pico::hal::multicore::Core<'a>,
         sys_freq: Rate<u32, 1, 1>,
-        i2c0_sda_pin: Pin<Gpio4, FunctionI2C, PullUp>,
-        i2c0_scl_pin: Pin<Gpio5, FunctionI2C, PullUp>,
     ) -> Self {
         // create the motor controller
         let motors = MotorController::new(ina1_pin, ina2_pin, inb1_pin, inb2_pin, duty_a, duty_b);
@@ -252,8 +247,7 @@ where
 
         let logger = Logger::new(Logger::<SPI_DEV, DELAY, 128>::init_log_file(&mut sd_card));
 
-        let mut heading_core1 = HeadingManager::new(core1, sys_freq);
-        heading_core1.start_heading_calculation(timer.clone(), i2c0_sda_pin, i2c0_scl_pin);
+        let heading_core1 = HeadingManager::new(core1, sys_freq, timer);
 
         Self {
             motors,
@@ -272,7 +266,12 @@ where
     }
 
     /// Inits the Robot software. This function should be called after the robot is created.
-    pub fn init(&mut self) -> Result<(), embedded_sdmmc::Error<embedded_sdmmc::SdCardError>> {
+    pub fn init<LEDPIN: OutputPin + Send + 'static>(
+        &mut self,
+        i2c0_sda_pin: Pin<Gpio4, FunctionI2C, PullUp>,
+        i2c0_scl_pin: Pin<Gpio5, FunctionI2C, PullUp>,
+        led_pin: LEDPIN,
+    ) -> Result<(), embedded_sdmmc::Error<embedded_sdmmc::SdCardError>> {
         // load configuration from the SD card
         if self.sd_card.root_dir().is_some() {
             let root_dir = self.sd_card.root_dir().unwrap();
@@ -298,33 +297,27 @@ where
                     })?;
                 debug!("Config file contents:\n{}", config_str);
                 self.config.set_config_values(config_str);
-
-                // set the gyro offsets from the config file
-                // if self.heading_calculator.is_inited() {
-                //     self.heading_calculator.set_gyro_offsets(
-                //         self.config.gyro_offset_x,
-                //         self.config.gyro_offset_y,
-                //         self.config.gyro_offset_z,
-                //     );
-                // }
             } else {
                 debug!("Config file not found, using defaults");
             }
         } else {
             warn!("Could not load configuration. Using defaults.");
         }
+        self.heading_core1.start_heading_calculation(
+            self.delay,
+            i2c0_sda_pin,
+            i2c0_scl_pin,
+            led_pin,
+            Vector3d {
+                x: self.config.gyro_offset_x,
+                y: self.config.gyro_offset_y,
+                z: self.config.gyro_offset_z,
+            },
+        );
         writeln!(self.logger, "Robot started\n{}\n", self.config)
             .map_err(|_e| embedded_sdmmc::SdCardError::WriteError)?;
         info!("Robot initialized\n{}\n", self.config);
         Ok(())
-    }
-
-    pub fn calibrate_gyro(&mut self, delay: &mut DELAY) {
-        // self.heading_calculator.calibrate(delay, |step| {
-        //     if let Ok(lcd) = self.lcd.set_cursor(0, 1) {
-        //         write!(lcd, "iteration: {}", step).ok();
-        //     }
-        // });
     }
 
     /// This function is called in the main loop to allow the robot to handle state updates
@@ -482,10 +475,9 @@ where
                 millis(),
                 0,
                 0,
-                100,
-                100,
-                // self.heading_calculator.heading(),
-                180.0, // FIXME: remove this hardcoded value
+                self.config.straight_left_power,
+                self.config.straight_right_power,
+                self.heading_core1.get_heading() as f64,
                 0.,
             ),
         )
@@ -507,8 +499,8 @@ where
                 last_update_millis = millis();
 
                 // let heading = self.heading_calculator.heading();
-                let heading = 0.0; // FIXME: remove this hardcoded value
-                let control_signal = controller.update(heading as f32, last_update_millis);
+                let heading = self.heading_core1.get_heading();
+                let control_signal = controller.update(heading, last_update_millis);
 
                 let mut cs_indicator: &str = direction_arrow;
                 // positive control signal means turn left, a negative control signal means turn right
@@ -535,12 +527,11 @@ where
                         right_wheel_ticks,
                         left_power as u8,
                         right_power as u8,
-                        heading,
+                        heading as f64,
                         control_signal,
                     ),
                 )
                 .ok();
-                // self.heading_calculator.update();
 
                 let wheel_ticks_per_mm = self.config.wheel_ticks_per_mm;
                 if let Err(error) = core::write!(
@@ -552,7 +543,6 @@ where
                 ) {
                     error!("Error writing to LCD: {}", error.to_string().as_str());
                 }
-                // self.heading_calculator.update();
                 if let Err(error) = core::write!(
                     self.set_lcd_cursor(0, 1),
                     "{} : cs={:.3}",
@@ -589,8 +579,7 @@ where
                 right_wheel_ticks,
                 0,
                 0,
-                // self.heading_calculator.heading(),
-                0.0, // FIXME: remove this hardcoded value
+                self.heading_core1.get_heading() as f64,
                 0.,
             ),
         )
@@ -636,10 +625,9 @@ where
         ) {
             error!("Error writing to LCD: {}", error.to_string().as_str());
         }
-        // self.heading_calculator.reset();
+        self.heading_core1.reset_heading();
         self.handle_loop();
-        // let mut current_angle = self.heading_calculator.heading() as f32;
-        let mut current_angle = 0.0; // FIXME: remove this hardcoded value
+        let mut current_angle = self.heading_core1.get_heading();
         let mut last_adjust_angle = current_angle;
 
         // start the motors per right hand rule (postive angle = left turn, negative angle = right turn)
@@ -665,8 +653,7 @@ where
         };
 
         while current_angle.abs() < (turn_degrees.abs() + stop_angle_delta) as f32 {
-            // current_angle = self.heading_calculator.heading() as f32;
-            current_angle = 0.0; // FIXME: remove this hardcoded value
+            current_angle = self.heading_core1.get_heading();
             if (current_angle - last_adjust_angle).abs() > 10.0 {
                 last_adjust_angle = current_angle;
                 if let Err(error) = core::write!(
@@ -682,13 +669,11 @@ where
 
             self.handle_loop();
         }
-        // let motors_off_heading = self.heading_calculator.heading();
-        let motors_off_heading = 0.0; // FIXME: remove this hardcoded value
+        let motors_off_heading = self.heading_core1.get_heading();
         self.motors.brake();
         self.delay.delay_ms(100);
         self.motors.stop();
-        // current_angle = self.heading_calculator.heading() as f32;
-        current_angle = 0.0; // FIXME: remove this hardcoded value
+        current_angle = self.heading_core1.get_heading();
         if let Err(error) = core::write!(
             self.clear_lcd().set_lcd_cursor(0, 0),
             "{} {} / {}\x03",
@@ -721,6 +706,7 @@ where
         &mut self,
     ) -> Result<(), i2c_character_display::CharacterDisplayError<CriticalSectionDevice<'a, TWI1>>>
     {
+        self.heading_core1.reset_heading();
         write!(self.lcd.clear()?.set_cursor(0, 0)?, "Heading:").ok();
         // self.heading_calculator.reset();
         let mut continue_loop = true;
@@ -732,15 +718,6 @@ where
                 continue_loop = false;
             }
             if millis() - last_update_millis > 200 {
-                // let heading = self.heading_calculator.heading();
-                // if let Err(error) = core::write!(
-                //     self.lcd.set_cursor(0, 1)?,
-                //     "{:.2}{: <16}",
-                //     heading,
-                //     DEGREES_STRING
-                // ) {
-                //     error!("Error writing to LCD: {}", error.to_string().as_str());
-                // }
                 let heading = self.heading_core1.get_heading();
                 if let Err(e) = core::write!(
                     self.lcd.set_cursor(0, 1)?,

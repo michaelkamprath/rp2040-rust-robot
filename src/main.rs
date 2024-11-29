@@ -6,7 +6,7 @@ mod robot;
 mod system;
 
 use core::cell::RefCell;
-use defmt::{error, info, panic};
+use defmt::{info, panic};
 use defmt_rtt as _;
 use panic_probe as _;
 
@@ -136,9 +136,9 @@ fn main() -> ! {
     let sd_card_device = embedded_hal_bus::spi::CriticalSectionDevice::new(
         &spi_mutex,
         pins.gpio1.into_push_pull_output(),
-        timer.clone(),
+        timer,
     );
-    let sd = crate::robot::file_storage::FileStorage::new(sd_card_device, timer.clone());
+    let sd = crate::robot::file_storage::FileStorage::new(sd_card_device, timer);
 
     // If SD card is successfully initialized, we can increase the SPI speed
     info!(
@@ -172,11 +172,10 @@ fn main() -> ! {
         &mut timer,
         core1,
         sys_freq,
-        sda0_pin,
-        scl0_pin,
     );
 
-    if let Err(e) = robot.init() {
+    let led_pin = pins.gpio16.into_push_pull_output();
+    if let Err(e) = robot.init(sda0_pin, scl0_pin, led_pin) {
         panic!("Error initializing Robot: {:?}", e);
     }
 
