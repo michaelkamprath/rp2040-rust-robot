@@ -28,6 +28,7 @@ pub fn millis() -> u64 {
     })
 }
 
+#[allow(dead_code)]
 pub fn millis_tenths() -> u64 {
     cortex_m::interrupt::free(|cs| {
         MILLIS_TIMER

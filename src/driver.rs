@@ -31,13 +31,12 @@ pub struct Driver<
     ENB: SetDutyCycle,
     BUTT1: InputPin,
     BUTT2: InputPin,
-    TWI0: I2c,
     TWI1: I2c,
     SPI_DEV: SpiDevice<u8>,
     DELAY: DelayNs + Clone,
     LED1: OutputPin,
 > {
-    robot: Robot<'a, INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI0, TWI1, SPI_DEV, DELAY>,
+    robot: Robot<'a, INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI1, SPI_DEV, DELAY>,
     delay: DELAY,
     led1: LED1,
     selected_path: Option<String>,
@@ -53,29 +52,14 @@ impl<
         ENB: SetDutyCycle,
         BUTT1: InputPin,
         BUTT2: InputPin,
-        TWI0: I2c,
         TWI1: I2c,
         SPI_DEV: SpiDevice<u8>,
         DELAY: DelayNs + Clone,
         LED1: OutputPin,
-    > Driver<'a, INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI0, TWI1, SPI_DEV, DELAY, LED1>
+    > Driver<'a, INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI1, SPI_DEV, DELAY, LED1>
 {
     pub fn new(
-        robot: Robot<
-            'a,
-            INA1,
-            INA2,
-            INB1,
-            INB2,
-            ENA,
-            ENB,
-            BUTT1,
-            BUTT2,
-            TWI0,
-            TWI1,
-            SPI_DEV,
-            DELAY,
-        >,
+        robot: Robot<'a, INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI1, SPI_DEV, DELAY>,
         delay: DELAY,
         led1_pin: LED1,
     ) -> Self {
@@ -234,9 +218,8 @@ impl<
         // - button one will select the current function and execute it
         // - if no button is pressed for the idle wait time, return to idle state
 
-        const FUNCTIONS: [&str; 6] = [
+        const FUNCTIONS: [&str; 5] = [
             "Select Path",
-            "Calibrate Gyro",
             "Heading Display",
             "Drive Straight",
             "Turn Left",
@@ -282,20 +265,10 @@ impl<
                         self.robot.start_display_reset_timer();
                     }
                     1 => {
-                        write!(
-                            self.robot.clear_lcd().set_lcd_cursor(0, 0),
-                            "Calibrating gyro",
-                        )
-                        .ok();
-                        self.robot.calibrate_gyro(&mut self.delay);
-                        write!(self.robot.set_lcd_cursor(0, 1), "      Done      ",).ok();
-                        self.robot.start_display_reset_timer();
-                    }
-                    2 => {
                         self.robot.display_heading().ok();
                         self.robot.set_display_to_idle();
                     }
-                    3 => {
+                    2 => {
                         write!(
                             self.robot.clear_lcd().set_lcd_cursor(0, 0),
                             "Driving straight",
@@ -305,7 +278,7 @@ impl<
                         self.robot.straight(1500, true);
                         self.robot.start_display_reset_timer();
                     }
-                    4 => {
+                    3 => {
                         write!(
                             self.robot.clear_lcd().set_lcd_cursor(0, 0),
                             "Turning left   \x7F",
@@ -315,7 +288,7 @@ impl<
                         self.robot.turn(90);
                         self.robot.start_display_reset_timer();
                     }
-                    5 => {
+                    4 => {
                         write!(
                             self.robot.clear_lcd().set_lcd_cursor(0, 0),
                             "Turning right  \x7E",

@@ -6,7 +6,7 @@ mod robot;
 mod system;
 
 use core::cell::RefCell;
-use defmt::{error, info, panic};
+use defmt::{info, panic};
 use defmt_rtt as _;
 use panic_probe as _;
 
@@ -24,7 +24,7 @@ use bsp::{
     },
 };
 use driver::Driver;
-use rp_pico as bsp;
+use rp_pico::{self as bsp, hal::multicore::Multicore};
 use system::millis::init_millis;
 extern crate alloc;
 
@@ -39,14 +39,17 @@ fn main() -> ! {
         use core::mem::MaybeUninit;
         const HEAP_SIZE: usize = 4048;
         static mut HEAP_MEM: [MaybeUninit<u8>; HEAP_SIZE] = [MaybeUninit::uninit(); HEAP_SIZE];
-        unsafe { HEAP.init(HEAP_MEM.as_ptr() as usize, HEAP_SIZE) }
+        #[allow(static_mut_refs)]
+        unsafe {
+            HEAP.init(HEAP_MEM.as_ptr() as usize, HEAP_SIZE)
+        }
     }
 
     info!("Program start");
     let mut pac = pac::Peripherals::take().unwrap();
     let _core = pac::CorePeripherals::take().unwrap();
     let mut watchdog = Watchdog::new(pac.WATCHDOG);
-    let sio = Sio::new(pac.SIO);
+    let mut sio = Sio::new(pac.SIO);
 
     // External high-speed crystal on the pico board is 12Mhz
     let external_xtal_freq_hz = 12_000_000u32;
@@ -61,6 +64,7 @@ fn main() -> ! {
     )
     .ok()
     .unwrap();
+    let sys_freq = clocks.system_clock.freq();
 
     let pins = bsp::Pins::new(
         pac.IO_BANK0,
@@ -94,16 +98,16 @@ fn main() -> ! {
     let sda1_pin: Pin<_, FunctionI2C, PullUp> = pins.gpio6.reconfigure();
     let scl1_pin: Pin<_, FunctionI2C, PullUp> = pins.gpio7.reconfigure();
     // set up I2C
-    let i2c0 = bsp::hal::I2C::new_controller(
-        pac.I2C0,
-        sda0_pin,
-        scl0_pin,
-        HertzU32::from_raw(400_000),
-        &mut pac.RESETS,
-        clocks.system_clock.freq(),
-    );
-    let i2c0_ref_cell = RefCell::new(i2c0);
-    let i2c0_mutex = critical_section::Mutex::new(i2c0_ref_cell);
+    // let i2c0 = bsp::hal::I2C::new_controller(
+    //     pac.I2C0,
+    //     sda0_pin,
+    //     scl0_pin,
+    //     HertzU32::from_raw(400_000),
+    //     &mut pac.RESETS,
+    //     clocks.system_clock.freq(),
+    // );
+    // let i2c0_ref_cell = RefCell::new(i2c0);
+    // let i2c0_mutex = critical_section::Mutex::new(i2c0_ref_cell);
 
     let i2c1 = bsp::hal::I2C::new_controller(
         pac.I2C1,
@@ -130,30 +134,30 @@ fn main() -> ! {
         HertzU32::from_raw(400_000), // card initialization happens at low baud rate
         embedded_hal::spi::MODE_0,
     );
+    let spi_mutex = critical_section::Mutex::new(RefCell::new(spi));
 
-    let sd = crate::robot::file_storage::FileStorage::new(
-        crate::robot::file_storage::sd_card_spi_device::SDCardSPIDevice::new(
-            spi,
-            pins.gpio1.into_push_pull_output(),
-            timer,
-        ),
+    let sd_card_device = embedded_hal_bus::spi::CriticalSectionDevice::new(
+        &spi_mutex,
+        pins.gpio1.into_push_pull_output(),
         timer,
     );
+    let sd = crate::robot::file_storage::FileStorage::new(sd_card_device, timer);
 
     // If SD card is successfully initialized, we can increase the SPI speed
-    match sd.spi(|spi| {
-        spi.bus.set_baudrate(
-            clocks.peripheral_clock.freq(),
-            HertzU32::from_raw(16_000_000),
-        )
-    }) {
-        Some(speed) => {
-            info!("SPI speed increased to {}", speed.raw());
-        }
-        None => {
-            error!("Error increasing SPI speed");
-        }
-    }
+    info!(
+        "SPI speed increased to {}",
+        critical_section::with(|cs| {
+            spi_mutex.borrow_ref_mut(cs).set_baudrate(
+                clocks.peripheral_clock.freq(),
+                HertzU32::from_raw(16_000_000),
+            )
+        })
+        .raw()
+    );
+    // get core1 ready
+    let mut mc = Multicore::new(&mut pac.PSM, &mut pac.PPB, &mut sio.fifo);
+    let cores = mc.cores();
+    let core1 = &mut cores[1];
 
     let mut robot = Robot::new(
         pins.gpio10.into_push_pull_output(),
@@ -164,16 +168,18 @@ fn main() -> ! {
         channel_b,
         pins.gpio14.into_pull_up_input(),
         pins.gpio15.into_pull_up_input(),
-        &i2c0_mutex,
         &i2c1_mutex,
         pins.gpio21.into_pull_up_input(),
         pins.gpio20.into_pull_up_input(),
         sd,
         &mut timer,
+        core1,
+        sys_freq,
     );
 
-    if let Err(e) = robot.init() {
-        panic!("Error initializing SD card: {:?}", e);
+    let led_pin = pins.gpio16.into_push_pull_output();
+    if let Err(e) = robot.init(sda0_pin, scl0_pin, led_pin) {
+        panic!("Error initializing Robot: {:?}", e);
     }
 
     let mut driver = Driver::new(robot, timer, pins.led.into_push_pull_output());

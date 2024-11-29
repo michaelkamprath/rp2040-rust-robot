@@ -1,6 +1,5 @@
 #![allow(clippy::type_complexity)]
 pub mod logger;
-pub mod sd_card_spi_device;
 pub mod sd_file;
 
 use alloc::{rc::Rc, string::ToString, vec::Vec};
@@ -130,17 +129,22 @@ where
         self.root_dir
     }
 
-    pub fn open_directory(&self, parent: RawDirectory, name: &str) -> Option<RawDirectory> {
+    pub fn open_directory(
+        &self,
+        parent: RawDirectory,
+        name: &str,
+    ) -> Result<RawDirectory, embedded_sdmmc::Error<SdCardError>> {
         match self
             .volume_mgr
-            .as_ref()?
+            .as_ref()
+            .unwrap()
             .borrow_mut()
             .open_dir(parent, name)
         {
-            Ok(dir) => Some(dir),
+            Ok(dir) => Ok(dir),
             Err(e) => {
                 error!("Error opening directory '{}': {:?}", name, e);
-                None
+                Err(e)
             }
         }
     }
@@ -195,7 +199,7 @@ where
         ext: &str,
     ) -> Result<Vec<DirEntry>, embedded_sdmmc::Error<SdCardError>> {
         let mut files: Vec<DirEntry> = Vec::new();
-        let dir = self.open_directory(parent_dir, target_dir).unwrap();
+        let dir = self.open_directory(parent_dir, target_dir)?;
         self.iterate_dir(dir, |entry| {
             if entry.name.to_string().ends_with(ext) {
                 debug!("Found path file: {:?}", entry.name.to_string().as_str());
