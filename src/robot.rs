@@ -752,7 +752,6 @@ where
 
 /// Implements the defmt::Format trait for the Robot struct, allowing the Robot object to be printed with defmt
 impl<
-        'a,
         INA1: OutputPin,
         INA2: OutputPin,
         INB1: OutputPin,
@@ -764,7 +763,7 @@ impl<
         TWI1,
         SPI_DEV: SpiDevice<u8>,
         DELAY,
-    > Format for Robot<'a, INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI1, SPI_DEV, DELAY>
+    > Format for Robot<'_, INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI1, SPI_DEV, DELAY>
 where
     TWI1: I2c,
     DELAY: DelayNs + Clone,
@@ -781,7 +780,6 @@ where
 
 /// Implement the `core::fmt::Write` trait for the robot, allowing us to use the `core::write!` macro
 impl<
-        'a,
         INA1: OutputPin,
         INA2: OutputPin,
         INB1: OutputPin,
@@ -794,7 +792,7 @@ impl<
         SPI_DEV: SpiDevice<u8>,
         DELAY,
     > core::fmt::Write
-    for Robot<'a, INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI1, SPI_DEV, DELAY>
+    for Robot<'_, INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI1, SPI_DEV, DELAY>
 where
     TWI1: I2c,
     DELAY: DelayNs + Clone,

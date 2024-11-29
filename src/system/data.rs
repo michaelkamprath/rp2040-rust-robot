@@ -153,7 +153,7 @@ where
     }
 }
 
-impl<'a, T, const M: usize> Format for DataTable<'a, T, M>
+impl<T, const M: usize> Format for DataTable<'_, T, M>
 where
     T: Copy + Default + Format,
 {
@@ -173,7 +173,7 @@ where
     }
 }
 
-impl<'a, T, const M: usize> core::fmt::Display for DataTable<'a, T, M>
+impl<T, const M: usize> core::fmt::Display for DataTable<'_, T, M>
 where
     T: Copy + Default + Format + core::fmt::Display,
 {
