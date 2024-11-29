@@ -733,6 +733,26 @@ where
 
         Ok(())
     }
+
+    pub fn display_gyro_offsets(
+        &mut self,
+    ) -> Result<(), i2c_character_display::CharacterDisplayError<CriticalSectionDevice<'a, TWI1>>>
+    {
+        let offsets = self.heading_core1.get_gyro_offsets();
+        if let Err(_e) = write!(self.lcd.clear()?.set_cursor(0, 0)?, "Gyro offsets:") {
+            error!("Error writing to LCD");
+        };
+        if let Err(_e) = write!(
+            self.lcd.set_cursor(0, 1)?,
+            "X:{} Y:{} Z:{}",
+            offsets.x,
+            offsets.y,
+            offsets.z
+        ) {
+            error!("Error writing to LCD");
+        };
+        Ok(())
+    }
     //--------------------------------------------------------------------------
     // LCD functions
     //--------------------------------------------------------------------------

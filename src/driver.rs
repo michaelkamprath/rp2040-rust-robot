@@ -218,12 +218,13 @@ impl<
         // - button one will select the current function and execute it
         // - if no button is pressed for the idle wait time, return to idle state
 
-        const FUNCTIONS: [&str; 5] = [
+        const FUNCTIONS: [&str; 6] = [
             "Select Path",
             "Heading Display",
             "Drive Straight",
             "Turn Left",
             "Turn Right",
+            "Gyro Offsets",
         ];
         let mut function_idx: usize = 0;
         let mut last_interaction_millis = millis();
@@ -296,6 +297,11 @@ impl<
                         .ok();
                         self.delay.delay_ms(500);
                         self.robot.turn(-90);
+                        self.robot.start_display_reset_timer();
+                    }
+                    5 => {
+                        write!(self.robot.clear_lcd().set_lcd_cursor(0, 0), "Gyro Offsets",).ok();
+                        self.robot.display_gyro_offsets().ok();
                         self.robot.start_display_reset_timer();
                     }
                     _ => {

@@ -114,6 +114,20 @@ impl<'a> HeadingManager<'a> {
                 }) {
                     defmt::error!("Error calibrating gyro");
                 }
+                let new_offsets: Vector3d<i16> = match gyro.get_gyro_offsets() {
+                    Ok(offsets) => Vector3d::<i16> {
+                        x: offsets.x as i16,
+                        y: offsets.y as i16,
+                        z: offsets.z as i16,
+                    },
+                    Err(_e) => {
+                        defmt::error!("Error getting gyro offsets");
+                        Vector3d::<i16> { x: 0, y: 0, z: 0 }
+                    }
+                };
+                critical_section::with(|cs| {
+                    GYRO_OFFSETS.borrow(cs).set(new_offsets);
+                });
             } else {
                 defmt::debug!(
                     "Setting gyro offsets: {{x: {}, y: {}, z: {} }}",
@@ -206,5 +220,10 @@ impl<'a> HeadingManager<'a> {
                 last_update_ticks: self.timer.get_counter().ticks(),
             });
         });
+    }
+
+    /// get the gyro offsets
+    pub fn get_gyro_offsets(&self) -> Vector3d<i16> {
+        critical_section::with(|cs| GYRO_OFFSETS.borrow(cs).get())
     }
 }
