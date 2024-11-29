@@ -72,6 +72,7 @@ impl<'a> HeadingManager<'a> {
         // spawn the heading calculation task on core1
         let sys_freq = self.sys_freq; // value that can be moved into the closure
         let mut timer = timer;
+        #[allow(static_mut_refs)]
         let _res = self.core1.spawn(unsafe { &mut CORE1_STACK.mem }, move || {
             // LED is used to indicate that the gyro is good to go. make sure it is off to start
             if let Err(_e) = led_pin.set_low() {
