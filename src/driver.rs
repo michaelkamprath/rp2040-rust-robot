@@ -34,11 +34,9 @@ pub struct Driver<
     TWI1: I2c,
     SPI_DEV: SpiDevice<u8>,
     DELAY: DelayNs + Clone,
-    LED1: OutputPin,
 > {
     robot: Robot<'a, INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI1, SPI_DEV, DELAY>,
     delay: DELAY,
-    led1: LED1,
     selected_path: Option<String>,
 }
 
@@ -55,18 +53,15 @@ impl<
         TWI1: I2c,
         SPI_DEV: SpiDevice<u8>,
         DELAY: DelayNs + Clone,
-        LED1: OutputPin,
-    > Driver<'a, INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI1, SPI_DEV, DELAY, LED1>
+    > Driver<'a, INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI1, SPI_DEV, DELAY>
 {
     pub fn new(
         robot: Robot<'a, INA1, INA2, INB1, INB2, ENA, ENB, BUTT1, BUTT2, TWI1, SPI_DEV, DELAY>,
         delay: DELAY,
-        led1_pin: LED1,
     ) -> Self {
         Self {
             robot,
             delay,
-            led1: led1_pin,
             selected_path: None,
         }
     }
@@ -83,7 +78,6 @@ impl<
 
     pub fn handle_loop(&mut self) {
         if self.robot.button1_pressed() {
-            self.led1.set_high().ok();
             debug!("button1 pressed");
             if self.selected_path.is_some() {
                 let filename = self.selected_path.clone();
@@ -104,7 +98,6 @@ impl<
                 write!(self.robot.set_lcd_cursor(0, 1), "No path loaded!").ok();
                 self.robot.start_display_reset_timer();
             }
-            self.led1.set_low().ok();
         }
         if self.robot.button2_pressed() {
             debug!("button2 pressed");

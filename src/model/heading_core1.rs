@@ -109,6 +109,7 @@ impl<'a> HeadingManager<'a> {
             let gyro_offsets = critical_section::with(|cs| GYRO_OFFSETS.borrow(cs).get());
             // if the offsets are all zero, then we calibrate. otherwise, we set the offsets
             if gyro_offsets.x == 0 && gyro_offsets.y == 0 && gyro_offsets.z == 0 {
+                defmt::info!("Configured gyro offsets are 0. Calibrating gyro ...");
                 if let Err(_e) = gyro.calibrate_gyro(&mut timer, |count| {
                     defmt::info!("Calibrating gyro: {}", count);
                 }) {

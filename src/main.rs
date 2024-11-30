@@ -177,12 +177,11 @@ fn main() -> ! {
         sys_freq,
     );
 
-    let led_pin = pins.gpio16.into_push_pull_output();
-    if let Err(e) = robot.init(sda0_pin, scl0_pin, led_pin) {
+    if let Err(e) = robot.init(sda0_pin, scl0_pin, pins.led.into_push_pull_output()) {
         panic!("Error initializing Robot: {:?}", e);
     }
 
-    let mut driver = Driver::new(robot, timer, pins.led.into_push_pull_output());
+    let mut driver = Driver::new(robot, timer);
 
     info!("robot controller and driver created");
 
