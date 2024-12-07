@@ -6,6 +6,7 @@ mod robot;
 mod system;
 
 use core::cell::RefCell;
+use critical_section::Mutex;
 use defmt::{info, panic};
 use defmt_rtt as _;
 use panic_probe as _;
@@ -16,7 +17,8 @@ use bsp::{
     hal::fugit::HertzU32,
     hal::{
         clocks::{init_clocks_and_plls, Clock},
-        gpio::{FunctionI2C, Pin, PullUp},
+        gpio::{bank0::Gpio25, FunctionI2C, FunctionSioOutput, Pin, PullNone, PullUp},
+        multicore::Multicore,
         pac,
         pwm::Slices,
         sio::Sio,
@@ -24,13 +26,16 @@ use bsp::{
     },
 };
 use driver::Driver;
-use rp_pico::{self as bsp, hal::multicore::Multicore};
+use rp_pico::{self as bsp};
 use system::millis::init_millis;
 extern crate alloc;
 
 use embedded_alloc::TlsfHeap as Heap;
 #[global_allocator]
 static HEAP: Heap = Heap::empty();
+
+static GLOBAL_LED_PIN: Mutex<RefCell<Option<Pin<Gpio25, FunctionSioOutput, PullNone>>>> =
+    Mutex::new(RefCell::new(None));
 
 #[entry]
 fn main() -> ! {
@@ -72,6 +77,11 @@ fn main() -> ! {
         sio.gpio_bank0,
         &mut pac.RESETS,
     );
+    critical_section::with(|cs| {
+        GLOBAL_LED_PIN
+            .borrow(cs)
+            .replace(Some(pins.led.reconfigure()));
+    });
 
     // init timer and millis
     let mut timer = rp_pico::hal::Timer::new(pac.TIMER, &mut pac.RESETS, &clocks);
@@ -97,6 +107,7 @@ fn main() -> ! {
     let scl0_pin: Pin<_, FunctionI2C, PullUp> = pins.gpio5.reconfigure();
     let sda1_pin: Pin<_, FunctionI2C, PullUp> = pins.gpio6.reconfigure();
     let scl1_pin: Pin<_, FunctionI2C, PullUp> = pins.gpio7.reconfigure();
+
     // set up I2C
     // let i2c0 = bsp::hal::I2C::new_controller(
     //     pac.I2C0,
@@ -177,7 +188,7 @@ fn main() -> ! {
         sys_freq,
     );
 
-    if let Err(e) = robot.init(sda0_pin, scl0_pin, pins.led.into_push_pull_output()) {
+    if let Err(e) = robot.init(sda0_pin, scl0_pin) {
         panic!("Error initializing Robot: {:?}", e);
     }
 

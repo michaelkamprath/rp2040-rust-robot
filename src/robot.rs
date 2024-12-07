@@ -266,11 +266,10 @@ where
     }
 
     /// Inits the Robot software. This function should be called after the robot is created.
-    pub fn init<LEDPIN: OutputPin + Send + 'static>(
+    pub fn init(
         &mut self,
         i2c0_sda_pin: Pin<Gpio4, FunctionI2C, PullUp>,
         i2c0_scl_pin: Pin<Gpio5, FunctionI2C, PullUp>,
-        led_pin: LEDPIN,
     ) -> Result<(), embedded_sdmmc::Error<embedded_sdmmc::SdCardError>> {
         // load configuration from the SD card
         if self.sd_card.root_dir().is_some() {
@@ -307,7 +306,6 @@ where
             self.delay,
             i2c0_sda_pin,
             i2c0_scl_pin,
-            led_pin,
             Vector3d {
                 x: self.config.gyro_offset_x,
                 y: self.config.gyro_offset_y,

@@ -1,21 +1,26 @@
+use crate::GLOBAL_LED_PIN;
 use bsp::hal::{
+    fugit::MicrosDurationU32,
     fugit::{HertzU32, Rate},
     gpio::{
         bank0::{Gpio4, Gpio5},
         FunctionI2C, Pin, PullUp,
     },
     multicore::Stack,
-    pac, Timer,
+    pac::{self, interrupt},
+    timer::{Alarm, Alarm3, Timer},
 };
 use core::cell::{Cell, RefCell};
 use critical_section::Mutex;
 use defmt::error;
-use embedded_hal::digital::OutputPin;
+use embedded_hal::digital::{OutputPin, StatefulOutputPin};
 use micromath::vector::Vector3d;
 use mpu6050::Mpu6050;
-use rp_pico as bsp;
+use rp_pico::{self as bsp};
 
 const HEADING_UPDATE_MICROS: u32 = 5 * 1000; // 5ms
+const LEDBLINK_ALARM_DURATION: MicrosDurationU32 = MicrosDurationU32::Hz(8);
+static LED_BLINK_ALARM: Mutex<RefCell<Option<Alarm3>>> = Mutex::new(RefCell::new(None));
 
 /// Stack for core 1
 static mut CORE1_STACK: Stack<4096> = Stack::new();
@@ -57,12 +62,11 @@ impl<'a> HeadingManager<'a> {
     }
 
     /// Start the heading calculation task on core 1, initializing I2C bus 0 and the gyro sensor.
-    pub fn start_heading_calculation<LEDPIN: OutputPin + Send + 'static>(
+    pub fn start_heading_calculation(
         &mut self,
         timer: Timer,
         i2c0_sda_pin: Pin<Gpio4, FunctionI2C, PullUp>,
         i2c0_scl_pin: Pin<Gpio5, FunctionI2C, PullUp>,
-        mut led_pin: LEDPIN,
         gyro_offsets: Vector3d<i16>,
     ) {
         critical_section::with(|cs| {
@@ -75,9 +79,13 @@ impl<'a> HeadingManager<'a> {
         #[allow(static_mut_refs)]
         let _res = self.core1.spawn(unsafe { &mut CORE1_STACK.mem }, move || {
             // LED is used to indicate that the gyro is good to go. make sure it is off to start
-            if let Err(_e) = led_pin.set_low() {
-                error!("Error setting LED pin low");
-            };
+            critical_section::with(|cs| {
+                if let Some(led_pin) = GLOBAL_LED_PIN.borrow(cs).borrow_mut().as_mut() {
+                    if let Err(_e) = led_pin.set_low() {
+                        error!("Error setting LED pin low");
+                    };
+                }
+            });
 
             // do the initialization in a critical section
             // set up environment
@@ -110,6 +118,18 @@ impl<'a> HeadingManager<'a> {
             // if the offsets are all zero, then we calibrate. otherwise, we set the offsets
             if gyro_offsets.x == 0 && gyro_offsets.y == 0 && gyro_offsets.z == 0 {
                 defmt::info!("Configured gyro offsets are 0. Calibrating gyro ...");
+                critical_section::with(|cs| {
+                    let mut alarm3 = timer.alarm_3().unwrap();
+                    if let Err(_e) = alarm3.schedule(LEDBLINK_ALARM_DURATION) {
+                        error!("Error scheduling alarm3");
+                        return;
+                    }
+                    alarm3.enable_interrupt();
+                    LED_BLINK_ALARM.borrow(cs).replace(Some(alarm3));
+                });
+                unsafe {
+                    pac::NVIC::unmask(pac::Interrupt::TIMER_IRQ_3);
+                }
                 if let Err(_e) = gyro.calibrate_gyro(&mut timer, |count| {
                     defmt::info!("Calibrating gyro: {}", count);
                 }) {
@@ -128,6 +148,17 @@ impl<'a> HeadingManager<'a> {
                 };
                 critical_section::with(|cs| {
                     GYRO_OFFSETS.borrow(cs).set(new_offsets);
+                    LED_BLINK_ALARM
+                        .borrow(cs)
+                        .borrow_mut()
+                        .as_mut()
+                        .unwrap()
+                        .disable_interrupt();
+                    if let Some(led_pin) = GLOBAL_LED_PIN.borrow(cs).borrow_mut().as_mut() {
+                        if let Err(_e) = led_pin.set_low() {
+                            error!("Error setting LED pin low");
+                        };
+                    }
                 });
             } else {
                 defmt::debug!(
@@ -143,9 +174,6 @@ impl<'a> HeadingManager<'a> {
                 }
             }
             defmt::info!("Gyro initialized : {}", gyro);
-            if let Err(_e) = led_pin.set_high() {
-                error!("Error setting LED pin high");
-            };
 
             critical_section::with(|cs| {
                 HEADING_VALUE.borrow(cs).set(HeadingData {
@@ -157,7 +185,7 @@ impl<'a> HeadingManager<'a> {
 
             // start the heading calculation task
             loop {
-                delay.delay_us(HEADING_UPDATE_MICROS / 10);
+                delay.delay_us(HEADING_UPDATE_MICROS / 4);
                 HeadingManager::update_heading(&mut gyro, &mut timer);
             }
         });
@@ -227,4 +255,20 @@ impl<'a> HeadingManager<'a> {
     pub fn get_gyro_offsets(&self) -> Vector3d<i16> {
         critical_section::with(|cs| GYRO_OFFSETS.borrow(cs).get())
     }
+}
+
+#[interrupt]
+fn TIMER_IRQ_3() {
+    // Toggle the LED pin on core 1
+    critical_section::with(|cs| {
+        if let Some(alarm) = LED_BLINK_ALARM.borrow(cs).borrow_mut().as_mut() {
+            alarm.clear_interrupt();
+            alarm.schedule(LEDBLINK_ALARM_DURATION).ok();
+            if let Some(led_pin) = GLOBAL_LED_PIN.borrow(cs).borrow_mut().as_mut() {
+                if let Err(_e) = led_pin.toggle() {
+                    error!("Error toggling LED pin");
+                };
+            }
+        }
+    });
 }
