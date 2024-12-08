@@ -126,7 +126,7 @@ pub struct Robot<
     idle_message_line2: Option<String>,
     config: Config,
     delay: Timer,
-    heading_core1: HeadingManager<'a>,
+    heading_calculator: HeadingManager<'a>,
 }
 
 #[allow(dead_code, non_camel_case_types)]
@@ -222,13 +222,6 @@ where
         };
         debug!("LCD characters created");
 
-        // let mut heading_calculator = HeadingCalculator::new(
-        //     embedded_hal_bus::i2c::CriticalSectionDevice::new(i2c0_refcell),
-        //     timer,
-        //     core1,
-        // );
-        // heading_calculator.reset();
-
         if let Err(_e) = lcd
             .home()
             .and_then(AdafruitLCDBackpack::clear)
@@ -261,7 +254,7 @@ where
             idle_message_line2: None,
             config: Config::new(),
             delay: *timer,
-            heading_core1,
+            heading_calculator: heading_core1,
         }
     }
 
@@ -302,7 +295,7 @@ where
         } else {
             warn!("Could not load configuration. Using defaults.");
         }
-        self.heading_core1.start_heading_calculation(
+        self.heading_calculator.start_heading_calculation(
             self.delay,
             i2c0_sda_pin,
             i2c0_scl_pin,
@@ -459,7 +452,8 @@ where
         );
         // we want to go straight, so the setpoint is 0
         controller.set_setpoint(0.);
-        // self.heading_calculator.reset();
+        controller.set_max_control_signal(25.0);
+        self.heading_calculator.reset_heading();
 
         self.motors.set_duty(
             self.config.straight_left_power,
@@ -475,7 +469,7 @@ where
                 0,
                 self.config.straight_left_power,
                 self.config.straight_right_power,
-                self.heading_core1.get_heading() as f64,
+                self.heading_calculator.get_heading() as f64,
                 0.,
             ),
         )
@@ -497,7 +491,7 @@ where
                 last_update_millis = millis();
 
                 // let heading = self.heading_calculator.heading();
-                let heading = self.heading_core1.get_heading();
+                let heading = self.heading_calculator.get_heading();
                 let control_signal = controller.update(heading, last_update_millis);
 
                 let mut cs_indicator: &str = direction_arrow;
@@ -577,7 +571,7 @@ where
                 right_wheel_ticks,
                 0,
                 0,
-                self.heading_core1.get_heading() as f64,
+                self.heading_calculator.get_heading() as f64,
                 0.,
             ),
         )
@@ -623,9 +617,9 @@ where
         ) {
             error!("Error writing to LCD: {}", error.to_string().as_str());
         }
-        self.heading_core1.reset_heading();
+        self.heading_calculator.reset_heading();
         self.handle_loop();
-        let mut current_angle = self.heading_core1.get_heading();
+        let mut current_angle = self.heading_calculator.get_heading();
         let mut last_adjust_angle = current_angle;
 
         // start the motors per right hand rule (postive angle = left turn, negative angle = right turn)
@@ -651,7 +645,7 @@ where
         };
 
         while current_angle.abs() < (turn_degrees.abs() + stop_angle_delta) as f32 {
-            current_angle = self.heading_core1.get_heading();
+            current_angle = self.heading_calculator.get_heading();
             if (current_angle - last_adjust_angle).abs() > 10.0 {
                 last_adjust_angle = current_angle;
                 if let Err(error) = core::write!(
@@ -667,11 +661,11 @@ where
 
             self.handle_loop();
         }
-        let motors_off_heading = self.heading_core1.get_heading();
+        let motors_off_heading = self.heading_calculator.get_heading();
         self.motors.brake();
         self.delay.delay_ms(100);
         self.motors.stop();
-        current_angle = self.heading_core1.get_heading();
+        current_angle = self.heading_calculator.get_heading();
         if let Err(error) = core::write!(
             self.clear_lcd().set_lcd_cursor(0, 0),
             "{} {} / {}\x03",
@@ -704,7 +698,7 @@ where
         &mut self,
     ) -> Result<(), i2c_character_display::CharacterDisplayError<CriticalSectionDevice<'a, TWI1>>>
     {
-        self.heading_core1.reset_heading();
+        self.heading_calculator.reset_heading();
         write!(self.lcd.clear()?.set_cursor(0, 0)?, "Heading:").ok();
         // self.heading_calculator.reset();
         let mut continue_loop = true;
@@ -716,7 +710,7 @@ where
                 continue_loop = false;
             }
             if millis() - last_update_millis > 200 {
-                let heading = self.heading_core1.get_heading();
+                let heading = self.heading_calculator.get_heading();
                 if let Err(e) = core::write!(
                     self.lcd.set_cursor(0, 1)?,
                     "{:.2}{: <16}",
@@ -736,7 +730,7 @@ where
         &mut self,
     ) -> Result<(), i2c_character_display::CharacterDisplayError<CriticalSectionDevice<'a, TWI1>>>
     {
-        let offsets = self.heading_core1.get_gyro_offsets();
+        let offsets = self.heading_calculator.get_gyro_offsets();
         if let Err(_e) = write!(self.lcd.clear()?.set_cursor(0, 0)?, "Gyro offsets:") {
             error!("Error writing to LCD");
         };
